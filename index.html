@@ -1,0 +1,1327 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0b0b0c">
+<title>Teleprompter</title>
+<style>
+:root {
+  --bg: #0b0b0c;
+  --fg: #f5f5f7;
+  --fg2: rgba(245,245,247,.62);
+  --fg3: rgba(245,245,247,.36);
+  --hair: rgba(255,255,255,.08);
+  --fill: rgba(255,255,255,.07);
+  --fill2: rgba(255,255,255,.12);
+  --glass: rgba(30,30,32,.62);
+  --accent: #0a84ff;
+  --danger: #ff453a;
+  --warn: #ffd60a;
+  --shadow: 0 12px 40px rgba(0,0,0,.45), 0 1px 0 rgba(255,255,255,.04) inset;
+  --ease: cubic-bezier(.25,.1,.25,1);
+  --glide: cubic-bezier(.22,.8,.26,1);
+  --fs: 56px;
+  --lw: 960px;
+  --anchor: 46%;
+  color-scheme: dark;
+}
+:root[data-theme="light"] {
+  --bg: #f5f5f7;
+  --fg: #1d1d1f;
+  --fg2: rgba(29,29,31,.62);
+  --fg3: rgba(29,29,31,.36);
+  --hair: rgba(0,0,0,.08);
+  --fill: rgba(0,0,0,.05);
+  --fill2: rgba(0,0,0,.09);
+  --glass: rgba(255,255,255,.72);
+  --accent: #007aff;
+  --danger: #ff3b30;
+  --warn: #c79200;
+  --shadow: 0 12px 40px rgba(0,0,0,.12);
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  transition: background-color 300ms var(--ease), color 300ms var(--ease);
+}
+button, input, textarea, select { font: inherit; color: inherit; }
+button { cursor: pointer; border: 0; background: none; padding: 0; }
+svg.i { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+svg.i.solid { fill: currentColor; stroke: none; }
+.hidden { display: none !important; }
+
+.glass {
+  background: var(--glass);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
+  backdrop-filter: saturate(180%) blur(24px);
+  border: 1px solid var(--hair);
+  box-shadow: var(--shadow);
+}
+
+/* ---------- Loader ---------- */
+#loader {
+  position: fixed; inset: 0; z-index: 40;
+  display: flex; align-items: center; justify-content: center;
+  padding: max(24px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
+  overflow-y: auto;
+  background: var(--bg);
+  transition: opacity 250ms var(--ease);
+}
+body.has-srt #loader { background: rgba(0,0,0,.45); }
+:root[data-theme="light"] body.has-srt #loader { background: rgba(0,0,0,.18); }
+body:not(.show-loader) #loader { opacity: 0; pointer-events: none; }
+.loader-card {
+  width: 100%; max-width: 560px; margin: auto;
+  border-radius: 16px; padding: 32px;
+  position: relative;
+}
+body:not(.has-srt) .loader-card { background: transparent; border-color: transparent; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+.loader-card h1 { font-size: 34px; font-weight: 700; letter-spacing: -.02em; margin: 0 0 6px; }
+.loader-card .sub { color: var(--fg2); margin: 0 0 28px; font-size: 16px; line-height: 1.45; }
+.close-btn { position: absolute; top: 14px; right: 14px; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; color: var(--fg2); background: var(--fill); transition: background 200ms var(--ease); }
+.close-btn:hover { background: var(--fill2); }
+body:not(.has-srt) .close-btn { display: none; }
+.drop {
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  padding: 36px 20px; border-radius: 14px; text-align: center; cursor: pointer;
+  background: var(--fill);
+  outline: 1.5px dashed var(--fill2); outline-offset: -1.5px;
+  transition: background 220ms var(--ease), outline-color 220ms var(--ease), transform 220ms var(--ease);
+}
+.drop:hover, body.dragging .drop { background: var(--fill2); outline-color: var(--accent); }
+.drop svg.i { width: 34px; height: 34px; color: var(--accent); }
+.drop strong { font-size: 17px; font-weight: 600; }
+.drop span { color: var(--fg2); font-size: 14px; }
+.or { display: flex; align-items: center; gap: 12px; color: var(--fg3); font-size: 13px; margin: 22px 0 12px; }
+.or::before, .or::after { content: ""; flex: 1; height: 1px; background: var(--hair); }
+textarea {
+  width: 100%; min-height: 120px; resize: vertical; border: 0; outline: 0;
+  border-radius: 12px; padding: 12px 14px; background: var(--fill);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 16px; line-height: 1.4;
+  transition: box-shadow 200ms var(--ease);
+  user-select: text; -webkit-user-select: text;
+}
+textarea:focus { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 45%, transparent); }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.btn {
+  height: 40px; padding: 0 18px; border-radius: 12px; font-size: 15px; font-weight: 600;
+  background: var(--fill2); display: inline-flex; align-items: center; gap: 8px;
+  transition: background 200ms var(--ease), transform 200ms var(--ease), opacity 200ms var(--ease);
+}
+.btn:hover { background: color-mix(in srgb, var(--fill2) 100%, var(--fg) 6%); }
+.btn:active { transform: scale(.97); }
+.btn.primary { background: var(--accent); color: #fff; }
+.btn.primary:hover { background: color-mix(in srgb, var(--accent) 88%, #fff); }
+.btn.link { background: none; color: var(--accent); padding: 0 6px; }
+.error {
+  margin-top: 16px; padding: 12px 14px; border-radius: 12px; font-size: 14px; line-height: 1.45;
+  background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--danger);
+}
+.keys { margin-top: 24px; color: var(--fg3); font-size: 13px; line-height: 1.8; }
+kbd { font-family: inherit; font-size: 12px; padding: 1px 6px; border-radius: 6px; background: var(--fill); color: var(--fg2); }
+
+/* ---------- Stage ---------- */
+#stage { position: fixed; inset: 0; }
+body:not(.has-srt) #stage { visibility: hidden; }
+
+#reader {
+  position: absolute; inset: 0; overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 22%, #000 80%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 22%, #000 80%, transparent 100%);
+}
+#reader { transition: opacity 300ms var(--ease); }
+body[data-state="idle"] #reader, body[data-state="finished"] #reader { opacity: .35; }
+.mirror #reader, .mirror #countdown { transform: scaleX(-1); }
+#track {
+  position: absolute; left: 0; right: 0; top: 0;
+  transition: transform 560ms var(--glide);
+  will-change: transform;
+}
+.cue {
+  position: relative;
+  max-width: var(--lw); margin: 0 auto;
+  padding: .2em 24px;
+  font-size: clamp(22px, var(--fs), 9.2vw);
+  line-height: 1.35; font-weight: 600; letter-spacing: -.012em;
+  text-align: center; text-wrap: balance;
+  color: var(--fg);
+  opacity: 0; transform: scale(.66);
+  transition: opacity 320ms var(--ease), transform 480ms var(--glide);
+}
+.cue .txt { display: block; }
+.cue.cur  { opacity: 1; transform: none; }
+.cue.up   { opacity: .78; transform: scale(.88); }
+.cue.prev { opacity: .2; }
+.cue.past { opacity: .32; transform: scale(.8); }
+.cue.n1   { opacity: .42; }
+.cue.n2   { opacity: .2; }
+.cue .bar {
+  display: block; height: 3px; width: min(280px, 46%); margin: .3em auto 0; border-radius: 3px;
+  background: var(--fill2); overflow: hidden; opacity: 0; transition: opacity 250ms var(--ease);
+}
+.cue .bar i { display: block; height: 100%; width: 100%; background: var(--accent); transform-origin: left center; border-radius: 3px; }
+.cue.cur .bar { opacity: 1; }
+.cue .ready {
+  position: absolute; left: 0; right: 0; bottom: 100%;
+  display: flex; justify-content: center; pointer-events: none;
+  opacity: 0; transition: opacity 250ms var(--ease);
+}
+.cue .ready b {
+  font-size: 15px; font-weight: 600; letter-spacing: .01em; line-height: 1;
+  padding: 7px 12px; border-radius: 999px; margin-bottom: 10px;
+  color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent);
+  font-variant-numeric: tabular-nums;
+}
+.cue.up .ready { opacity: 1; }
+body[data-state="idle"] .cue .ready, body[data-state="finished"] .cue .ready { opacity: 0; }
+
+/* top bar */
+#topbar {
+  position: absolute; left: 0; right: 0; top: 0; z-index: 10;
+  padding: calc(env(safe-area-inset-top) + 12px) max(18px, env(safe-area-inset-right)) 0 max(18px, env(safe-area-inset-left));
+  display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px;
+  font-size: 13px; color: var(--fg2); font-variant-numeric: tabular-nums; letter-spacing: .01em;
+  pointer-events: none;
+}
+#topbar .l { justify-self: start; }
+#topbar .r { justify-self: end; }
+#clock { color: var(--fg); font-weight: 600; }
+#take { padding: 5px 10px; border-radius: 999px; background: var(--fill); color: var(--fg2); white-space: nowrap; opacity: 0; transition: opacity 250ms var(--ease); }
+#take.on { opacity: 1; }
+#take em { font-style: normal; color: var(--fg); font-weight: 600; }
+#overall { position: absolute; top: 0; left: 0; right: 0; height: 2px; z-index: 11; background: var(--fill); }
+#overall i { display: block; height: 100%; width: 100%; background: var(--accent); transform-origin: left center; transform: scaleX(0); }
+
+/* countdown */
+#countdown {
+  position: absolute; left: 0; right: 0; top: 13%; z-index: 5;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  pointer-events: none; opacity: 0; transition: opacity 220ms var(--ease);
+}
+#countdown.on { opacity: 1; }
+#cdNum { font-size: clamp(64px, 12vw, 120px); font-weight: 200; line-height: 1; font-variant-numeric: tabular-nums; color: var(--fg); }
+#cdNum.tick { animation: tick 520ms var(--glide); }
+@keyframes tick { from { transform: scale(1.25); opacity: .2; } to { transform: none; opacity: 1; } }
+#cdLabel { font-size: 15px; color: var(--fg2); font-variant-numeric: tabular-nums; text-align: center; padding: 0 16px; }
+#cdLabel em { font-style: normal; color: var(--fg); font-weight: 600; }
+
+/* ready / finished card */
+#card {
+  position: absolute; left: 50%; top: 50%; z-index: 20;
+  width: min(440px, calc(100vw - 32px));
+  max-height: calc(100% - 40px); overflow-y: auto;
+  transform: translate(-50%, -50%);
+  border-radius: 16px; padding: 26px 24px 20px; text-align: center;
+  transition: opacity 280ms var(--ease), transform 280ms var(--ease);
+}
+body[data-state="running"] #card, body[data-state="paused"] #card { opacity: 0; transform: translate(-50%, -46%) scale(.98); pointer-events: none; }
+#cardKicker { font-size: 13px; color: var(--fg2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#cardTitle { font-size: 24px; font-weight: 700; letter-spacing: -.015em; margin: 4px 0 18px; }
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px; }
+.stat { background: var(--fill); border-radius: 12px; padding: 10px 6px; }
+.stat b { display: block; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.stat span { font-size: 11px; color: var(--fg2); text-transform: uppercase; letter-spacing: .05em; }
+#warn { font-size: 13px; color: var(--fg2); line-height: 1.45; margin: -4px 0 14px; }
+#warn:empty { display: none; }
+.bigplay {
+  width: 76px; height: 76px; border-radius: 50%; margin: 6px auto 8px; display: grid; place-items: center;
+  background: var(--accent); color: #fff;
+  box-shadow: 0 8px 26px color-mix(in srgb, var(--accent) 45%, transparent);
+  transition: transform 220ms var(--ease), box-shadow 220ms var(--ease);
+}
+.bigplay:hover { transform: scale(1.05); }
+.bigplay:active { transform: scale(.96); }
+.bigplay svg.i { width: 32px; height: 32px; margin-left: 4px; }
+.fromrow { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 15px; color: var(--fg2); margin-top: 10px; }
+.num {
+  width: 64px; height: 34px; border: 0; outline: 0; border-radius: 10px; text-align: center;
+  background: var(--fill2); font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums;
+  transition: box-shadow 200ms var(--ease);
+  -moz-appearance: textfield; appearance: textfield;
+}
+.num::-webkit-inner-spin-button, .num::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.num:focus { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 45%, transparent); }
+#beepAt { font-size: 13px; color: var(--fg3); margin-top: 8px; font-variant-numeric: tabular-nums; }
+.cardfoot { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--hair); font-size: 14px; }
+
+/* dock */
+#dock {
+  position: absolute; left: 12px; right: 12px; bottom: calc(env(safe-area-inset-bottom) + 18px); z-index: 15;
+  width: -webkit-fit-content; width: fit-content; margin: 0 auto;
+  display: flex; align-items: center; gap: 4px; flex-wrap: wrap; justify-content: center;
+  padding: 6px; border-radius: 16px;
+  transition: opacity 300ms var(--ease), transform 300ms var(--ease);
+}
+.ib {
+  width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; color: var(--fg);
+  transition: background 200ms var(--ease), transform 200ms var(--ease), color 200ms var(--ease);
+}
+.ib:hover { background: var(--fill2); }
+.ib:active { transform: scale(.94); }
+.ib.main { width: 52px; height: 44px; background: var(--accent); color: #fff; }
+.ib.main:hover { background: color-mix(in srgb, var(--accent) 88%, #fff); }
+.sep { width: 1px; height: 24px; background: var(--hair); margin: 0 6px; }
+.dockfrom { display: flex; align-items: center; gap: 6px; padding: 0 4px 0 8px; font-size: 13px; color: var(--fg2); }
+.dockfrom .num { width: 56px; height: 32px; }
+.dockfrom .btn { height: 32px; padding: 0 12px; font-size: 13px; border-radius: 10px; }
+body.idle #dock { opacity: 0; transform: translateY(16px); pointer-events: none; }
+body.idle { cursor: none; }
+body[data-state="idle"] #dock, body[data-state="finished"] #dock { opacity: 0; pointer-events: none; transform: translateY(16px); }
+body.preroll .cue.prev { opacity: 0; }
+#fsBtn.hidden { display: none; }
+
+/* settings sheet */
+#settings {
+  position: fixed; z-index: 30; top: calc(env(safe-area-inset-top) + 14px); right: max(14px, env(safe-area-inset-right));
+  width: 340px; max-height: calc(100% - 28px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); overflow-y: auto;
+  border-radius: 16px; padding: 18px 18px 14px;
+  transition: opacity 260ms var(--ease), transform 260ms var(--ease);
+}
+body:not(.show-settings) #settings { opacity: 0; transform: translateY(-8px) scale(.98); pointer-events: none; }
+#settings h2 { margin: 0 0 12px; font-size: 17px; font-weight: 700; }
+.set { padding: 12px 0; border-top: 1px solid var(--hair); }
+.set:first-of-type { border-top: 0; }
+.set .head { display: flex; justify-content: space-between; align-items: center; font-size: 15px; margin-bottom: 8px; }
+.set .head.only { margin-bottom: 0; }
+.set .val { color: var(--fg2); font-variant-numeric: tabular-nums; font-size: 14px; }
+.set .hint { font-size: 12px; color: var(--fg3); margin-top: 6px; line-height: 1.4; }
+input[type="range"] { width: 100%; accent-color: var(--accent); margin: 0; height: 24px; }
+.seg { display: flex; background: var(--fill); border-radius: 10px; padding: 2px; }
+.seg button { flex: 1; height: 30px; border-radius: 8px; font-size: 14px; font-weight: 500; color: var(--fg2); transition: background 200ms var(--ease), color 200ms var(--ease); }
+.seg button.on { background: var(--fill2); color: var(--fg); box-shadow: 0 1px 3px rgba(0,0,0,.15); }
+.stepper { display: flex; align-items: center; gap: 6px; }
+.stepper .ib { width: 32px; height: 32px; border-radius: 9px; background: var(--fill); }
+.stepper .num { width: 78px; }
+.switch { position: relative; width: 46px; height: 28px; flex: none; }
+.switch input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; z-index: 1; }
+.switch span { position: absolute; inset: 0; border-radius: 999px; background: var(--fill2); transition: background 220ms var(--ease); }
+.switch span::after { content: ""; position: absolute; top: 2px; left: 2px; width: 24px; height: 24px; border-radius: 50%; background: #fff; box-shadow: 0 2px 5px rgba(0,0,0,.25); transition: transform 220ms var(--ease); }
+.switch input:checked + span { background: #30d158; }
+.switch input:checked + span::after { transform: translateX(18px); }
+.switch input:focus-visible + span { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 45%, transparent); }
+
+/* misc */
+#flash { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 100; }
+#toast {
+  position: fixed; left: 16px; right: 16px; bottom: calc(env(safe-area-inset-bottom) + 92px); z-index: 50;
+  width: -webkit-fit-content; width: fit-content; margin: 0 auto;
+  transform: translateY(10px); opacity: 0; pointer-events: none;
+  padding: 10px 16px; border-radius: 12px; font-size: 14px; text-align: center;
+  font-variant-numeric: tabular-nums;
+  transition: opacity 240ms var(--ease), transform 240ms var(--ease);
+}
+#toast.on { opacity: 1; transform: none; }
+#dropHint {
+  position: fixed; inset: 12px; z-index: 60; border-radius: 16px; pointer-events: none;
+  display: grid; place-items: center; font-size: 22px; font-weight: 600; color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  outline: 2px dashed var(--accent); outline-offset: -2px;
+  opacity: 0; transition: opacity 200ms var(--ease);
+}
+body.dragging.has-srt:not(.show-loader) #dropHint { opacity: 1; }
+
+@media (max-width: 640px) {
+  .loader-card { padding: 24px 4px; }
+  body.has-srt .loader-card { padding: 24px 18px; }
+  .stats { grid-template-columns: repeat(2, 1fr); }
+  #topbar { grid-template-columns: 1fr 1fr; row-gap: 8px; }
+  #topbar .c { grid-row: 2; grid-column: 1 / -1; justify-self: center; }
+  #settings { left: 12px; right: 12px; width: auto; top: auto; bottom: calc(env(safe-area-inset-bottom) + 12px); max-height: 78%; }
+  body:not(.show-settings) #settings { transform: translateY(16px); }
+  .sep { display: none; }
+  .ib { width: 40px; }
+  #dock { bottom: calc(env(safe-area-inset-bottom) + 12px); }
+  .dockfrom { order: 10; width: 100%; justify-content: center; padding: 4px 0 2px; }
+  .cue { padding: .2em 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #track, .cue { transition-duration: 1ms; }
+}
+</style>
+</head>
+<body data-state="idle">
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M7.5 5.2v13.6a.8.8 0 0 0 1.2.7l11-6.8a.8.8 0 0 0 0-1.4l-11-6.8a.8.8 0 0 0-1.2.7z"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6" y="5" width="4.2" height="14" rx="1.2"/><rect x="13.8" y="5" width="4.2" height="14" rx="1.2"/></symbol>
+  <symbol id="i-restart" viewBox="0 0 24 24"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3"/><path d="M4.5 4.5v4h4"/></symbol>
+  <symbol id="i-prev" viewBox="0 0 24 24"><path d="M14.5 6l-6 6 6 6"/></symbol>
+  <symbol id="i-next" viewBox="0 0 24 24"><path d="M9.5 6l6 6-6 6"/></symbol>
+  <symbol id="i-fs" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2.2"/><circle cx="9" cy="17" r="2.2"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2.5"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15V4M7.5 8.5L12 4l4.5 4.5"/><path d="M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></symbol>
+  <symbol id="i-minus" viewBox="0 0 24 24"><path d="M6 12h12"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M6 12h12M12 6v12"/></symbol>
+</svg>
+
+<!-- ============ STAGE ============ -->
+<main id="stage">
+  <div id="reader"><div id="track"></div></div>
+
+  <div id="overall"><i id="overallBar"></i></div>
+  <header id="topbar">
+    <div class="l"><span id="clock">00:00.000</span> <span id="total">/ 00:00</span></div>
+    <div class="c"><span id="take"></span></div>
+    <div class="r"><span id="cueNo">– / –</span></div>
+  </header>
+
+  <div id="countdown" aria-live="assertive">
+    <div id="cdNum">3</div>
+    <div id="cdLabel"></div>
+  </div>
+
+  <section id="card" class="glass">
+    <div id="cardKicker"></div>
+    <div id="cardTitle">Ready</div>
+    <div class="stats">
+      <div class="stat"><b id="stCues">0</b><span>Cues</span></div>
+      <div class="stat"><b id="stDur">0:00</b><span>Duration</span></div>
+      <div class="stat"><b id="stFirst">0:00</b><span>First cue</span></div>
+      <div class="stat"><b id="stLast">0:00</b><span>Last cue</span></div>
+    </div>
+    <div id="warn"></div>
+    <button class="bigplay" id="startBtn" aria-label="Start"><svg class="i solid"><use href="#i-play"/></svg></button>
+    <div class="fromrow">Start from cue <input class="num" id="cardFrom" type="number" min="1" step="1" value="1" inputmode="numeric"> <span id="cardOf">of 0</span></div>
+    <div id="beepAt"></div>
+    <div class="cardfoot">
+      <button class="btn link" id="changeFile">Change file</button>
+      <label class="row" style="gap:10px;color:var(--fg2)">Sync beep <span class="switch"><input type="checkbox" id="cardBeep"><span></span></span></label>
+    </div>
+  </section>
+
+  <nav id="dock" class="glass">
+    <button class="ib" id="restartBtn" title="Restart from the beginning (R)"><svg class="i"><use href="#i-restart"/></svg></button>
+    <button class="ib" id="prevBtn" title="Previous cue (←)"><svg class="i"><use href="#i-prev"/></svg></button>
+    <button class="ib main" id="playBtn" title="Pause / Resume (Space)"><svg class="i solid"><use id="playIcon" href="#i-pause"/></svg></button>
+    <button class="ib" id="nextBtn" title="Next cue (→)"><svg class="i"><use href="#i-next"/></svg></button>
+    <div class="sep"></div>
+    <div class="dockfrom">Cue <input class="num" id="dockFrom" type="number" min="1" step="1" value="1" inputmode="numeric"><button class="btn" id="dockGo" title="Start a new take from this cue with a 3-second pre-roll">Start here</button></div>
+    <div class="sep"></div>
+    <button class="ib" id="setBtn" title="Settings"><svg class="i"><use href="#i-settings"/></svg></button>
+    <button class="ib" id="fsBtn" title="Fullscreen (F)"><svg class="i"><use href="#i-fs"/></svg></button>
+    <button class="ib" id="stopBtn" title="Stop (Esc)"><svg class="i solid"><use href="#i-stop"/></svg></button>
+  </nav>
+</main>
+
+<!-- ============ LOADER ============ -->
+<section id="loader">
+  <div class="loader-card glass">
+    <button class="close-btn" id="loaderClose" aria-label="Close"><svg class="i" style="width:18px;height:18px"><use href="#i-close"/></svg></button>
+    <h1>Teleprompter</h1>
+    <p class="sub">Load your video’s subtitles, press Start, and read each line as it comes up — in exact sync with the SRT timings.</p>
+    <label class="drop" id="drop">
+      <svg class="i"><use href="#i-upload"/></svg>
+      <strong>Drop an .srt file here</strong>
+      <span>or click to choose a file</span>
+      <input type="file" id="fileInput" accept=".srt,.txt,text/plain,application/x-subrip" hidden>
+    </label>
+    <div class="or">or paste SRT text</div>
+    <textarea id="paste" placeholder="1&#10;00:00:01,000 --> 00:00:04,000&#10;Hello there." spellcheck="false"></textarea>
+    <div class="row" style="margin-top:12px">
+      <button class="btn primary" id="pasteLoad">Load text</button>
+      <button class="btn" id="sampleLoad">Try the sample</button>
+    </div>
+    <div class="error hidden" id="loadError" role="alert"></div>
+    <div class="keys">
+      <kbd>Space</kbd> pause / resume &nbsp;·&nbsp; <kbd>←</kbd> <kbd>→</kbd> previous / next cue &nbsp;·&nbsp; <kbd>R</kbd> restart &nbsp;·&nbsp; <kbd>F</kbd> fullscreen &nbsp;·&nbsp; <kbd>S</kbd> settings
+    </div>
+  </div>
+</section>
+
+<!-- ============ SETTINGS ============ -->
+<aside id="settings" class="glass" aria-label="Settings">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <h2>Settings</h2>
+    <button class="close-btn" id="setClose" style="position:static;display:grid" aria-label="Close settings"><svg class="i" style="width:16px;height:16px"><use href="#i-close"/></svg></button>
+  </div>
+  <div class="set">
+    <div class="head"><span>Text size</span><span class="val" id="vFs"></span></div>
+    <input type="range" id="sFs" min="28" max="104" step="2">
+  </div>
+  <div class="set">
+    <div class="head"><span>Line width</span><span class="val" id="vLw"></span></div>
+    <input type="range" id="sLw" min="480" max="1600" step="20">
+  </div>
+  <div class="set">
+    <div class="head"><span>Theme</span></div>
+    <div class="seg" id="sTheme"><button data-v="dark">Dark</button><button data-v="light">Light</button></div>
+  </div>
+  <div class="set">
+    <div class="head"><span>Timing offset</span>
+      <div class="stepper">
+        <button class="ib" id="offMinus" aria-label="Earlier"><svg class="i" style="width:16px;height:16px"><use href="#i-minus"/></svg></button>
+        <input class="num" id="sOff" type="number" step="0.1" inputmode="decimal">
+        <button class="ib" id="offPlus" aria-label="Later"><svg class="i" style="width:16px;height:16px"><use href="#i-plus"/></svg></button>
+      </div>
+    </div>
+    <div class="hint">Seconds added to every cue. Positive = lines come later.</div>
+  </div>
+  <div class="set">
+    <div class="head"><span>Lead</span><span class="val" id="vLead"></span></div>
+    <input type="range" id="sLead" min="0" max="1" step="0.1">
+    <div class="hint">Show each line a little early so you can start reading on time. Progress bars and the beep still use the real timing.</div>
+  </div>
+  <div class="set"><div class="head only"><span>Mirror text</span><span class="switch"><input type="checkbox" id="sMirror"><span></span></span></div></div>
+  <div class="set"><div class="head only"><span>Sync beep at start</span><span class="switch"><input type="checkbox" id="sBeep"><span></span></span></div></div>
+  <div class="set"><div class="head only"><span>Sync flash at start</span><span class="switch"><input type="checkbox" id="sFlash"><span></span></span></div>
+    <div class="hint">A 1 kHz, 100 ms beep and a one-frame white flash mark the take’s start time, so you can line up your phone recording later. On iPhone, turn the silent switch off to hear the beep.</div></div>
+</aside>
+
+<div id="toast" class="glass"></div>
+<div id="dropHint">Drop to load subtitles</div>
+<div id="flash"></div>
+
+<script type="text/plain" id="sampleSrt">1
+00:00:01,000 --> 00:00:04,200
+Welcome back. Today we're looking at
+how light bends when it changes material.
+
+2
+00:00:04,400 --> 00:00:08,000
+This is called <i>refraction</i>.
+
+3
+00:00:08,000 --> 00:00:11,500
+光从空气进入水中时，
+速度会变慢。
+
+4
+00:00:14,000 --> 00:00:17,500
+That's why a straw looks broken
+in a glass of water.
+
+5
+00:00:17,000 --> 00:00:20,000
+这就是为什么吸管看起来像是<b>折断</b>了。
+
+6
+00:00:20,300 --> 00:00:24,800
+The amount of bending depends on the
+refractive index of each material.
+
+7
+00:00:25,000 --> 00:00:28,000
+折射率越大，光在其中传播得越慢。
+
+8
+00:00:31,500 --> 00:00:35,000
+Let's try a quick example with glass.
+
+9
+00:00:35,200 --> 00:00:39,600
+Glass has a refractive index of about 1.5,
+so light travels at two-thirds of its speed in air.
+
+10
+00:00:39,600 --> 00:00:43,000
+玻璃的折射率大约是一点五。
+
+11
+00:00:43,500 --> 00:00:46,900
+Now watch what happens at a steep angle.
+
+12
+00:00:46,500 --> 00:00:50,200
+<i>Total internal reflection.</i>
+全反射。
+
+13
+00:00:52,000 --> 00:00:55,500
+This is exactly how optical fibres
+carry light around corners.
+
+14
+00:00:55,700 --> 00:00:59,000
+光纤就是利用这个原理传输信号的。
+
+15
+00:00:59,000 --> 00:01:02,500
+So, three things to remember.
+
+16
+00:01:03,000 --> 00:01:06,800
+Light slows down in denser materials,
+it bends towards the normal,
+
+17
+00:01:07,000 --> 00:01:10,500
+and past the critical angle, it reflects completely.
+
+18
+00:01:12,000 --> 00:01:15,000
+谢谢观看，我们下次见！
+</script>
+
+<script>
+(function () {
+'use strict';
+
+/* =========================================================
+   Constants & helpers
+   ========================================================= */
+var PREROLL = 3;          // seconds of countdown before the take's start time
+var HOLD_GAP = 0.4;       // gaps shorter than this keep the previous line on screen
+var END_HOLD = 2;         // seconds after the last cue before showing "Finished"
+var IDLE_MS = 2500;       // auto-hide controls after this much inactivity
+var MAX_BYTES = 8 * 1024 * 1024;
+
+var $ = function (id) { return document.getElementById(id); };
+var clamp = function (v, a, b) { return v < a ? a : v > b ? b : v; };
+var store = {
+  get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set: function (k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } }
+};
+
+function pad(n, w) { n = String(n); while (n.length < w) n = '0' + n; return n; }
+/* Format seconds as [h:]mm:ss.mmm (or without ms). Uses integer milliseconds to avoid float jitter. */
+function fmt(t, withMs) {
+  if (withMs === undefined) withMs = true;
+  var neg = t < 0;
+  var ms = Math.floor(Math.abs(t) * 1000 + 1e-6);
+  if (!withMs) ms = Math.round(ms / 1000) * 1000;
+  var h = Math.floor(ms / 3600000), m = Math.floor(ms / 60000) % 60, s = Math.floor(ms / 1000) % 60, f = ms % 1000;
+  return (neg ? '−' : '') + (h ? h + ':' : '') + pad(m, 2) + ':' + pad(s, 2) + (withMs ? '.' + pad(f, 3) : '');
+}
+
+/* =========================================================
+   SRT parsing
+   ========================================================= */
+var TIME_RE = /^\s*(?:(\d{1,3}):)?(\d{1,2}):(\d{1,2})(?:[,.](\d{1,3}))?\s*-->\s*(?:(\d{1,3}):)?(\d{1,2}):(\d{1,2})(?:[,.](\d{1,3}))?/;
+var INDEX_RE = /^\s*\d+\s*$/;
+var CJK_RE = /[⺀-⿿　-〿぀-ヿ㄀-ㇿ㐀-䶿一-鿿가-힯豈-﫿＀-￯]/;
+
+function toSec(h, m, s, ms) {
+  var frac = ms ? (ms + '00').slice(0, 3) : '0';
+  return (+(h || 0)) * 3600 + (+m) * 60 + (+s) + (+frac) / 1000;
+}
+function cleanLine(l) {
+  return l
+    .replace(/\{\\[^}]*\}/g, '')            // ASS override tags {\an8}
+    .replace(/<\/?[a-zA-Z][^>]*>/g, '')     // <i>, </font>, <b> ...
+    .replace(/&nbsp;/gi, ' ').replace(/&lt;/gi, '<').replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"').replace(/&#0*39;|&apos;/gi, "'").replace(/&amp;/gi, '&')
+    .replace(/\\N/g, ' ')
+    .replace(/\s+/g, ' ').trim();
+}
+/* Join the lines of one cue: no space between two CJK characters, a space otherwise. */
+function joinLines(lines) {
+  var out = '';
+  for (var i = 0; i < lines.length; i++) {
+    var l = cleanLine(lines[i]);
+    if (!l) continue;
+    if (!out) { out = l; continue; }
+    out += (CJK_RE.test(out.slice(-1)) && CJK_RE.test(l.charAt(0))) ? '' : ' ';
+    out += l;
+  }
+  return out;
+}
+function isBlockStart(lines, i) {
+  return TIME_RE.test(lines[i]) || (INDEX_RE.test(lines[i]) && i + 1 < lines.length && TIME_RE.test(lines[i + 1]));
+}
+
+function parseSRT(raw) {
+  if (typeof raw !== 'string' || !raw.trim()) throw new Error('The subtitle text is empty.');
+  if ((raw.match(/\u0000/g) || []).length > 8) throw new Error('This doesn’t look like a text file. Please choose an .srt subtitle file.');
+  var lines = raw.replace(/^﻿/, '').replace(/\r\n?/g, '\n').split('\n');
+  var cues = [], emptyCount = 0, fixedCount = 0;
+  var i = 0;
+  while (i < lines.length) {
+    var m = TIME_RE.exec(lines[i]);
+    if (!m) { i++; continue; }
+    var start = toSec(m[1], m[2], m[3], m[4]);
+    var end = toSec(m[5], m[6], m[7], m[8]);
+    i++;
+    var body = [];
+    while (i < lines.length) {
+      var l = lines[i];
+      if (!l.trim()) {
+        // A blank line ends the cue unless more text follows that isn't a new block.
+        var j = i;
+        while (j < lines.length && !lines[j].trim()) j++;
+        if (j >= lines.length || isBlockStart(lines, j)) { i = j; break; }
+        i = j; continue;
+      }
+      if (isBlockStart(lines, i)) break;   // tolerate a missing blank line
+      body.push(l); i++;
+    }
+    var text = joinLines(body);
+    if (!text) { emptyCount++; continue; }
+    if (!(end > start)) { end = start + 1; fixedCount++; }
+    cues.push({ start: start, end: end, text: text, n: cues.length });
+  }
+  if (!cues.length) {
+    throw new Error('No subtitle cues found. An SRT needs timing lines like “00:01:02,345 --> 00:01:05,678”.');
+  }
+  cues.sort(function (a, b) { return a.start - b.start || a.n - b.n; });
+  var overlaps = 0;
+  for (var k = 0; k < cues.length; k++) {
+    cues[k].n = k;
+    if (k && cues[k].start < cues[k - 1].end - 1e-6) overlaps++;
+  }
+  return { cues: cues, emptyCount: emptyCount, fixedCount: fixedCount, overlaps: overlaps };
+}
+
+/* Decode a file: UTF-8 (with or without BOM), UTF-16 with BOM, else GB18030 / Big5 for older Chinese files. */
+function decodeBytes(u8) {
+  if (u8.length >= 2 && u8[0] === 0xFF && u8[1] === 0xFE) return new TextDecoder('utf-16le').decode(u8);
+  if (u8.length >= 2 && u8[0] === 0xFE && u8[1] === 0xFF) return new TextDecoder('utf-16be').decode(u8);
+  try { return new TextDecoder('utf-8', { fatal: true }).decode(u8); } catch (e) { /* not UTF-8 */ }
+  var encs = ['gb18030', 'big5', 'windows-1252'];
+  for (var i = 0; i < encs.length; i++) {
+    try { return new TextDecoder(encs[i]).decode(u8); } catch (e) { /* unsupported label */ }
+  }
+  return new TextDecoder().decode(u8);
+}
+function readFile(file) {
+  return new Promise(function (resolve, reject) {
+    if (!file) return reject(new Error('No file selected.'));
+    if (file.size === 0) return reject(new Error('“' + file.name + '” is empty.'));
+    if (file.size > MAX_BYTES) return reject(new Error('“' + file.name + '” is too large to be a subtitle file.'));
+    var fr = new FileReader();
+    fr.onload = function () {
+      try { resolve(decodeBytes(new Uint8Array(fr.result))); } catch (e) { reject(new Error('Could not read “' + file.name + '”.')); }
+    };
+    fr.onerror = function () { reject(new Error('Could not read “' + file.name + '”.')); };
+    fr.readAsArrayBuffer(file);
+  });
+}
+
+/* =========================================================
+   State
+   ========================================================= */
+var DEFAULTS = { fs: 56, lw: 960, theme: 'dark', offset: 0, lead: 0, mirror: false, beep: true, flash: true };
+var settings = Object.assign({}, DEFAULTS);
+try { Object.assign(settings, JSON.parse(store.get('tp.settings') || '{}')); } catch (e) { /* ignore */ }
+
+var S = {
+  cues: [], name: '', els: [],
+  state: 'idle',            // idle | running | paused | finished
+  clockBase: 0,             // clock value (s) at `anchor`
+  anchor: 0,                // performance.now() when clockBase was set
+  takeStart: 0,             // clock time of the take's sync mark (beep)
+  takeCue: 0,
+  markFired: false, beepRefined: false, beepNode: null,
+  lastKey: '', classed: [], focus: -1, lastCd: -1,
+  raf: 0
+};
+
+/* The clock: derived from performance.now() each time it's read — never accumulated. */
+function clockT() {
+  return S.state === 'running' ? S.clockBase + (performance.now() - S.anchor) / 1000 : S.clockBase;
+}
+function setClock(t) { S.clockBase = t; S.anchor = performance.now(); }
+function totalDur() { var c = S.cues; return c.length ? c[c.length - 1].end + settings.offset : 0; }
+function lastEnd() { var m = 0; for (var i = 0; i < S.cues.length; i++) m = Math.max(m, S.cues[i].end); return m; }
+
+/* Which cue is on screen at clock time t.
+   cur = the line being read, up = the next line during a gap, done = after the last line. */
+function locate(t) {
+  var cues = S.cues, n = cues.length;
+  var tl = t - settings.offset + settings.lead;
+  var lo = 0, hi = n - 1, k = -1;
+  while (lo <= hi) { var mid = (lo + hi) >> 1; if (cues[mid].start <= tl) { k = mid; lo = mid + 1; } else hi = mid - 1; }
+  if (k < 0) return { cur: -1, up: 0, done: false };
+  if (tl < cues[k].end) return { cur: k, up: -1, done: false };
+  // Overlap: an earlier cue may still be running after the latest one ended.
+  if (k > 0 && tl < cues[k - 1].end && cues[k - 1].end > cues[k].end) return { cur: k, up: -1, done: false };
+  if (k + 1 >= n) return { cur: -1, up: -1, done: true };
+  if (cues[k + 1].start - cues[k].end < HOLD_GAP) return { cur: k, up: -1, done: false };
+  return { cur: -1, up: k + 1, done: false };
+}
+
+/* =========================================================
+   DOM refs
+   ========================================================= */
+var body = document.body, root = document.documentElement;
+var reader = $('reader'), track = $('track');
+var clockEl = $('clock'), totalEl = $('total'), cueNoEl = $('cueNo'), takeEl = $('take'), overallBar = $('overallBar');
+var cdWrap = $('countdown'), cdNum = $('cdNum'), cdLabel = $('cdLabel');
+var flashEl = $('flash'), toastEl = $('toast');
+
+/* =========================================================
+   Building the cue list
+   ========================================================= */
+function buildTrack() {
+  track.textContent = '';
+  S.els = [];
+  var frag = document.createDocumentFragment();
+  for (var i = 0; i < S.cues.length; i++) {
+    var el = document.createElement('div');
+    el.className = 'cue';
+    var ready = document.createElement('span'); ready.className = 'ready'; ready.appendChild(document.createElement('b'));
+    var txt = document.createElement('span'); txt.className = 'txt'; txt.textContent = S.cues[i].text;
+    var bar = document.createElement('span'); bar.className = 'bar'; bar.appendChild(document.createElement('i'));
+    el.appendChild(ready); el.appendChild(txt); el.appendChild(bar);
+    frag.appendChild(el);
+    S.els.push(el);
+  }
+  track.appendChild(frag);
+  S.classed = []; S.lastKey = ''; S.focus = -1;
+}
+
+function applyClasses(L, focus) {
+  for (var i = 0; i < S.classed.length; i++) {
+    var e = S.els[S.classed[i]]; if (e) e.className = 'cue';
+  }
+  S.classed = [];
+  var set = function (idx, cls) { if (idx >= 0 && idx < S.els.length) { S.els[idx].className = 'cue ' + cls; S.classed.push(idx); } };
+  set(focus - 1, 'prev');
+  set(focus, L.cur >= 0 ? 'cur' : L.up >= 0 ? 'up' : 'past');
+  set(focus + 1, 'n1');
+  set(focus + 2, 'n2');
+}
+
+function positionTrack(instant) {
+  var el = S.els[S.focus];
+  if (!el) return;
+  var anchor = reader.clientHeight * 0.46;
+  var y = Math.round(anchor - (el.offsetTop + el.offsetHeight / 2));
+  if (instant) {
+    track.style.transition = 'none';
+    track.style.transform = 'translate3d(0,' + y + 'px,0)';
+    void track.offsetHeight;
+    track.style.transition = '';
+  } else {
+    track.style.transform = 'translate3d(0,' + y + 'px,0)';
+  }
+}
+
+/* =========================================================
+   Render (called every animation frame while running)
+   ========================================================= */
+function render(instant) {
+  if (!S.cues.length) return;
+  var t = clockT();
+  var off = settings.offset;
+  var L = locate(t);
+  var n = S.cues.length;
+  var focus = L.cur >= 0 ? L.cur : L.up >= 0 ? L.up : n - 1;
+  var key = L.cur + '|' + L.up + '|' + (L.done ? 1 : 0);
+  if (key !== S.lastKey || instant) {
+    S.lastKey = key;
+    var moved = focus !== S.focus;
+    S.focus = focus;
+    applyClasses(L, focus);
+    if (moved || instant) positionTrack(instant);
+  }
+
+  // Per-cue progress: share of the cue's (real, un-led) time window that's left.
+  if (L.cur >= 0) {
+    var c = S.cues[L.cur], cs = c.start + off, ce = c.end + off;
+    var rem = clamp((ce - t) / (ce - cs), 0, 1);
+    S.els[L.cur].lastChild.firstChild.style.transform = 'scaleX(' + rem.toFixed(4) + ')';
+  }
+  // "Get ready" countdown in gaps.
+  if (L.up >= 0) {
+    var dt = S.cues[L.up].start + off - t;
+    S.els[L.up].firstChild.firstChild.textContent = dt > 0.05 ? 'Get ready · ' + dt.toFixed(1) + ' s' : 'Now';
+  }
+
+  // Top bar.
+  var preroll = S.state !== 'idle' && !S.markFired && t < S.takeStart;
+  var shown = (S.state === 'idle') ? S.takeStart : preroll ? S.takeStart : t;
+  clockEl.textContent = fmt(shown);
+  var tot = totalDur();
+  overallBar.style.transform = 'scaleX(' + (tot > 0 ? clamp(shown / tot, 0, 1) : 0).toFixed(4) + ')';
+  cueNoEl.textContent = (focus + 1) + ' / ' + n;
+
+  // Pre-roll countdown 3-2-1.
+  if (preroll) {
+    var num = clamp(Math.ceil(S.takeStart - t - 1e-6), 1, PREROLL);
+    if (num !== S.lastCd) {
+      S.lastCd = num;
+      cdNum.textContent = num;
+      cdNum.classList.remove('tick'); void cdNum.offsetWidth; cdNum.classList.add('tick');
+    }
+    cdWrap.classList.add('on');
+    body.classList.add('preroll');
+  } else if (cdWrap.classList.contains('on')) {
+    cdWrap.classList.remove('on'); S.lastCd = -1;
+    body.classList.remove('preroll');
+  }
+
+  // Sync mark: the beep is scheduled ahead on the audio clock; the flash fires on the first frame at/after the mark.
+  if (S.state === 'running') {
+    if (!S.markFired && !S.beepRefined && t >= S.takeStart - 0.6) { S.beepRefined = true; scheduleBeep(); }
+    if (!S.markFired && t >= S.takeStart) {
+      S.markFired = true;
+      if (settings.flash) doFlash();
+    }
+    if (L.done && t > lastEnd() + off + END_HOLD) finish();
+  }
+}
+
+function loop() {
+  render(false);
+  if (S.state === 'running') S.raf = requestAnimationFrame(loop);
+  else S.raf = 0;
+}
+function startLoop() { if (!S.raf) S.raf = requestAnimationFrame(loop); }
+function renderSoon(instant) { requestAnimationFrame(function () { render(!!instant); }); }
+
+/* =========================================================
+   Audio sync beep (Web Audio, scheduled on the audio clock)
+   ========================================================= */
+var actx = null;
+function ensureAudio() {
+  try {
+    if (!actx) {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      actx = new AC({ latencyHint: 'interactive' });
+    }
+    if (actx.state !== 'running' && actx.resume) actx.resume();
+    // Unlock audio on iOS: play a silent buffer inside the user gesture.
+    var b = actx.createBuffer(1, 1, 22050), s = actx.createBufferSource();
+    s.buffer = b; s.connect(actx.destination); s.start(0);
+  } catch (e) { actx = null; }
+  return actx;
+}
+function cancelBeep() {
+  if (S.beepNode) {
+    try { S.beepNode.osc.stop(0); } catch (e) { /* already stopped */ }
+    try { S.beepNode.gain.disconnect(); } catch (e) { /* ignore */ }
+    S.beepNode = null;
+  }
+}
+function scheduleBeep() {
+  cancelBeep();
+  if (!settings.beep || !actx || S.state !== 'running' || S.markFired) return;
+  if (actx.state !== 'running') return;
+  // Target moment on the performance.now() timeline.
+  var perfTarget = S.anchor + (S.takeStart - S.clockBase) * 1000;
+  var when, ts = actx.getOutputTimestamp ? actx.getOutputTimestamp() : null;
+  if (ts && ts.performanceTime > 0 && ts.contextTime > 0) {
+    // Maps what is coming out of the speaker now to performance.now(), including output latency.
+    when = ts.contextTime + (perfTarget - ts.performanceTime) / 1000;
+  } else {
+    when = actx.currentTime + (perfTarget - performance.now()) / 1000 - (actx.outputLatency || actx.baseLatency || 0);
+  }
+  if (when < actx.currentTime) return;  // too late to schedule
+  var osc = actx.createOscillator(), gain = actx.createGain();
+  osc.type = 'sine';
+  osc.frequency.value = 1000;
+  gain.gain.setValueAtTime(0, when);
+  gain.gain.linearRampToValueAtTime(0.85, when + 0.002);
+  gain.gain.setValueAtTime(0.85, when + 0.095);
+  gain.gain.linearRampToValueAtTime(0, when + 0.1);
+  osc.connect(gain); gain.connect(actx.destination);
+  osc.start(when); osc.stop(when + 0.11);
+  S.beepNode = { osc: osc, gain: gain };
+}
+
+function doFlash() {
+  flashEl.style.opacity = '1';                       // painted this frame…
+  requestAnimationFrame(function () { flashEl.style.opacity = '0'; });  // …and gone the next.
+}
+
+/* =========================================================
+   Wake lock
+   ========================================================= */
+var wakeLock = null, wakeWarned = false;
+function keepAwake(on) {
+  if (!on) {
+    if (wakeLock) { try { wakeLock.release(); } catch (e) { /* ignore */ } }
+    wakeLock = null;
+    return;
+  }
+  if (wakeLock) return;
+  var warn = function () {
+    if (wakeWarned) return; wakeWarned = true;
+    toast('Can’t keep the screen awake here — set Auto-Lock / sleep to “Never” while recording.', 5000);
+  };
+  if (!('wakeLock' in navigator)) return warn();
+  navigator.wakeLock.request('screen').then(function (l) {
+    wakeLock = l;
+    l.addEventListener('release', function () { if (wakeLock === l) wakeLock = null; });
+    if (S.state !== 'running' && S.state !== 'paused') keepAwake(false);
+  }).catch(warn);
+}
+document.addEventListener('visibilitychange', function () {
+  if (document.visibilityState === 'visible' && (S.state === 'running' || S.state === 'paused')) keepAwake(true);
+});
+
+/* =========================================================
+   Transport
+   ========================================================= */
+function setState(st) {
+  S.state = st;
+  body.dataset.state = st;
+  $('playIcon').setAttribute('href', st === 'running' ? '#i-pause' : '#i-play');
+  if (st !== 'running') { body.classList.remove('idle'); clearTimeout(idleTimer); }
+  if (st === 'idle' || st === 'finished') { body.classList.remove('preroll'); cdWrap.classList.remove('on'); S.lastCd = -1; }
+  takeEl.classList.toggle('on', st === 'running' || st === 'paused');
+}
+
+function cueStartClock(idx) { return idx <= 0 ? 0 : S.cues[idx].start + settings.offset; }
+
+function startTake(n) {
+  if (!S.cues.length) return;
+  var idx = clamp((n | 0) - 1, 0, S.cues.length - 1);
+  setFrom(idx + 1);
+  ensureAudio();
+  cancelBeep();
+  S.takeCue = idx;
+  S.takeStart = cueStartClock(idx);
+  S.markFired = false; S.beepRefined = false; S.lastCd = -1;
+  setClock(S.takeStart - PREROLL);
+  setState('running');
+  takeEl.innerHTML = 'Take from cue ' + (idx + 1) + ' · sync mark <em>' + fmt(S.takeStart) + '</em>';
+  cdLabel.innerHTML = (settings.beep ? 'Beep at ' : 'Starts at ') + '<em>' + fmt(S.takeStart) + '</em>' + (idx > 0 ? ' · cue ' + (idx + 1) : '');
+  closeSettings();
+  render(true);
+  startLoop();
+  if (actx && actx.state !== 'running' && actx.resume) {
+    actx.resume().then(function () { if (S.state === 'running' && !S.markFired) scheduleBeep(); }).catch(function () {});
+  } else {
+    scheduleBeep();
+  }
+  keepAwake(true);
+  poke();
+}
+
+function pause() {
+  if (S.state !== 'running') return;
+  setClock(clockT());
+  cancelBeep();
+  setState('paused');
+  setFrom(S.focus + 1);
+  render(false);
+}
+function resume() {
+  if (S.state !== 'paused') return;
+  ensureAudio();
+  S.anchor = performance.now();     // clockBase already holds the paused time
+  S.beepRefined = false;
+  setState('running');
+  scheduleBeep();
+  startLoop();
+  keepAwake(true);
+  poke();
+}
+function togglePlay() {
+  if (S.state === 'running') pause();
+  else if (S.state === 'paused') resume();
+  else startTake(getFrom());
+}
+
+function jump(d) {
+  if (!S.cues.length) return;
+  var n = S.cues.length;
+  if (S.state === 'idle' || S.state === 'finished') { setFrom(getFrom() + d); return; }
+  var t = clockT();
+  if (!S.markFired && t < S.takeStart) return;   // no jumping during the countdown
+  var L = locate(t);
+  var base = L.cur >= 0 ? L.cur : L.up >= 0 ? (d > 0 ? L.up - 1 : L.up) : n;
+  var idx = clamp(base + d, 0, n - 1);
+  var c = S.cues[idx];
+  setClock(c.start + settings.offset - settings.lead + 0.0005);
+  S.lastKey = '';
+  render(false);
+  toast('Cue ' + (idx + 1) + ' · ' + fmt(c.start + settings.offset));
+}
+
+function finish() {
+  setClock(clockT());
+  cancelBeep();
+  setState('finished');
+  keepAwake(false);
+  $('cardTitle').textContent = 'Finished';
+  $('cardKicker').textContent = 'Take from cue ' + (S.takeCue + 1) + ' · sync mark ' + fmt(S.takeStart);
+  setFrom(1);
+}
+
+function stopTake() {
+  cancelBeep();
+  setState('idle');
+  keepAwake(false);
+  showReady();
+}
+
+function showReady() {
+  $('cardTitle').textContent = 'Ready';
+  $('cardKicker').textContent = S.name || 'Subtitles';
+  previewFrom();
+}
+
+/* Start-from-cue inputs (card + dock are kept in sync). */
+function getFrom() { var v = parseInt($('cardFrom').value, 10); return isNaN(v) ? 1 : v; }
+function setFrom(v) {
+  v = clamp(v | 0, 1, Math.max(1, S.cues.length));
+  $('cardFrom').value = v; $('dockFrom').value = v;
+  if (S.state === 'idle' || S.state === 'finished') previewFrom();
+}
+function previewFrom() {
+  if (!S.cues.length) return;
+  var idx = clamp(getFrom() - 1, 0, S.cues.length - 1);
+  S.takeStart = cueStartClock(idx);
+  // Show the chosen cue as the current line behind the card.
+  S.clockBase = S.cues[idx].start + settings.offset - settings.lead + 0.0005;
+  $('beepAt').textContent = (settings.beep ? 'Beep' : 'Sync mark') + ' at ' + fmt(S.takeStart) + ' after a 3-second countdown';
+  render(true);
+}
+
+/* =========================================================
+   Loading
+   ========================================================= */
+function showError(msg) {
+  var e = $('loadError');
+  e.textContent = msg; e.classList.remove('hidden');
+}
+function clearError() { $('loadError').classList.add('hidden'); }
+
+function loadText(text, name, save) {
+  var res;
+  try { res = parseSRT(text); }
+  catch (err) {
+    if (body.classList.contains('has-srt') && !body.classList.contains('show-loader')) toast(err.message, 5000);
+    else { openLoader(); showError(err.message); }
+    return false;
+  }
+  if (S.state === 'running' || S.state === 'paused') { cancelBeep(); keepAwake(false); }
+  setState('idle');
+  S.cues = res.cues;
+  S.name = name || 'Pasted subtitles';
+  buildTrack();
+
+  var c = S.cues;
+  $('stCues').textContent = c.length;
+  $('stDur').textContent = fmt(lastEnd(), false);
+  $('stFirst').textContent = fmt(c[0].start, false);
+  $('stLast').textContent = fmt(c[c.length - 1].start, false);
+  $('stFirst').title = fmt(c[0].start);
+  $('stLast').title = fmt(c[c.length - 1].start) + ' → ' + fmt(c[c.length - 1].end);
+  $('cardOf').textContent = 'of ' + c.length;
+  $('cardFrom').max = $('dockFrom').max = c.length;
+  totalEl.textContent = '/ ' + fmt(totalDur(), false);
+  var w = [];
+  if (res.overlaps) w.push(res.overlaps + ' overlapping cue' + (res.overlaps > 1 ? 's' : '') + ' (the later one is shown).');
+  if (res.fixedCount) w.push(res.fixedCount + ' cue' + (res.fixedCount > 1 ? 's' : '') + ' had an end time before the start; given 1 s.');
+  if (res.emptyCount) w.push(res.emptyCount + ' empty cue' + (res.emptyCount > 1 ? 's' : '') + ' skipped.');
+  $('warn').textContent = w.join(' ');
+
+  if (save) {
+    if (!store.set('tp.srt', JSON.stringify({ name: S.name, text: text }))) toast('Loaded, but couldn’t save it for next time (storage unavailable).', 4000);
+  }
+  body.classList.add('has-srt');
+  closeLoader();
+  clearError();
+  setFrom(1);
+  showReady();
+  return true;
+}
+
+function loadFile(file) {
+  readFile(file).then(function (text) { loadText(text, file.name, true); })
+    .catch(function (err) {
+      if (body.classList.contains('has-srt') && !body.classList.contains('show-loader')) toast(err.message, 5000);
+      else { openLoader(); showError(err.message); }
+    });
+}
+
+function openLoader() {
+  if (S.state === 'running') pause();
+  body.classList.add('show-loader');
+}
+function closeLoader() { body.classList.remove('show-loader'); }
+
+/* =========================================================
+   Settings
+   ========================================================= */
+function saveSettings() { store.set('tp.settings', JSON.stringify(settings)); }
+function applySettings(reflow) {
+  root.dataset.theme = settings.theme;
+  root.style.setProperty('--fs', settings.fs + 'px');
+  root.style.setProperty('--lw', settings.lw + 'px');
+  body.classList.toggle('mirror', !!settings.mirror);
+  document.querySelector('meta[name="theme-color"]').content = settings.theme === 'light' ? '#f5f5f7' : '#0b0b0c';
+  $('sFs').value = settings.fs; $('vFs').textContent = settings.fs + ' px';
+  $('sLw').value = settings.lw; $('vLw').textContent = settings.lw + ' px';
+  $('sLead').value = settings.lead; $('vLead').textContent = settings.lead > 0 ? settings.lead.toFixed(1) + ' s early' : 'Off';
+  if (document.activeElement !== $('sOff')) $('sOff').value = settings.offset.toFixed(2);
+  $('sMirror').checked = !!settings.mirror;
+  $('sBeep').checked = $('cardBeep').checked = !!settings.beep;
+  $('sFlash').checked = !!settings.flash;
+  var segs = $('sTheme').children;
+  for (var i = 0; i < segs.length; i++) segs[i].classList.toggle('on', segs[i].dataset.v === settings.theme);
+  if (S.cues.length) {
+    totalEl.textContent = '/ ' + fmt(totalDur(), false);
+    if (S.state === 'idle' || S.state === 'finished') previewFrom();
+    if (reflow) { S.lastKey = ''; render(true); }
+  }
+}
+function setSetting(k, v, reflow) {
+  settings[k] = v;
+  saveSettings();
+  applySettings(reflow);
+}
+function openSettings() { body.classList.add('show-settings'); poke(); }
+function closeSettings() { body.classList.remove('show-settings'); }
+
+$('sFs').addEventListener('input', function () { setSetting('fs', +this.value, true); });
+$('sLw').addEventListener('input', function () { setSetting('lw', +this.value, true); });
+$('sLead').addEventListener('input', function () { setSetting('lead', Math.round(+this.value * 10) / 10, true); });
+$('sTheme').addEventListener('click', function (e) { var b = e.target.closest('button'); if (b) setSetting('theme', b.dataset.v); });
+function setOffset(v) {
+  v = Math.round(clamp(v, -600, 600) * 100) / 100;
+  if (isNaN(v)) v = 0;
+  setSetting('offset', v, true);
+  // Keep the take's sync mark on its cue if we're waiting at the card.
+  $('sOff').value = v.toFixed(2);
+}
+$('sOff').addEventListener('change', function () { setOffset(parseFloat(this.value)); });
+$('offMinus').addEventListener('click', function () { setOffset(settings.offset - 0.1); });
+$('offPlus').addEventListener('click', function () { setOffset(settings.offset + 0.1); });
+$('sMirror').addEventListener('change', function () { setSetting('mirror', this.checked); });
+$('sBeep').addEventListener('change', function () { setSetting('beep', this.checked); if (!this.checked) cancelBeep(); });
+$('cardBeep').addEventListener('change', function () { setSetting('beep', this.checked); });
+$('sFlash').addEventListener('change', function () { setSetting('flash', this.checked); });
+$('setBtn').addEventListener('click', function () { body.classList.contains('show-settings') ? closeSettings() : openSettings(); });
+$('setClose').addEventListener('click', closeSettings);
+
+/* =========================================================
+   Fullscreen
+   ========================================================= */
+var fsEnabled = document.fullscreenEnabled || document.webkitFullscreenEnabled;
+if (!fsEnabled) $('fsBtn').classList.add('hidden');
+function toggleFullscreen() {
+  if (!fsEnabled) return;
+  var fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+  try {
+    if (fsEl) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+    else (root.requestFullscreen || root.webkitRequestFullscreen).call(root);
+  } catch (e) { /* ignore */ }
+}
+
+/* =========================================================
+   Auto-hide controls
+   ========================================================= */
+var idleTimer = 0;
+function poke() {
+  body.classList.remove('idle');
+  clearTimeout(idleTimer);
+  if (S.state === 'running') {
+    idleTimer = setTimeout(function () {
+      if (S.state === 'running' && !body.classList.contains('show-settings') && !body.classList.contains('show-loader')) body.classList.add('idle');
+    }, IDLE_MS);
+  }
+}
+['mousemove', 'pointerdown', 'touchstart', 'wheel'].forEach(function (ev) {
+  window.addEventListener(ev, poke, { passive: true });
+});
+
+/* =========================================================
+   Events
+   ========================================================= */
+$('startBtn').addEventListener('click', function () { startTake(getFrom()); });
+$('playBtn').addEventListener('click', togglePlay);
+$('restartBtn').addEventListener('click', function () { startTake(1); });
+$('prevBtn').addEventListener('click', function () { jump(-1); });
+$('nextBtn').addEventListener('click', function () { jump(1); });
+$('stopBtn').addEventListener('click', stopTake);
+$('fsBtn').addEventListener('click', toggleFullscreen);
+$('dockGo').addEventListener('click', function () { startTake(parseInt($('dockFrom').value, 10) || 1); });
+$('changeFile').addEventListener('click', openLoader);
+$('loaderClose').addEventListener('click', closeLoader);
+$('cardFrom').addEventListener('change', function () { setFrom(parseInt(this.value, 10) || 1); });
+$('cardFrom').addEventListener('keydown', function (e) { if (e.key === 'Enter') { this.blur(); startTake(parseInt(this.value, 10) || 1); } });
+$('dockFrom').addEventListener('keydown', function (e) { if (e.key === 'Enter') { this.blur(); startTake(parseInt(this.value, 10) || 1); } });
+
+$('fileInput').addEventListener('change', function () { if (this.files[0]) loadFile(this.files[0]); this.value = ''; });
+$('pasteLoad').addEventListener('click', function () {
+  var v = $('paste').value;
+  if (!v.trim()) { showError('Paste the contents of an .srt file into the box first.'); return; }
+  loadText(v, 'Pasted subtitles', true);
+});
+$('sampleLoad').addEventListener('click', function () { loadText($('sampleSrt').textContent.replace(/^\n/, ''), 'sample.srt', true); });
+
+// Drag & drop anywhere on the page.
+var dragDepth = 0;
+window.addEventListener('dragenter', function (e) { e.preventDefault(); dragDepth++; body.classList.add('dragging'); });
+window.addEventListener('dragover', function (e) { e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'; });
+window.addEventListener('dragleave', function () { if (--dragDepth <= 0) { dragDepth = 0; body.classList.remove('dragging'); } });
+window.addEventListener('drop', function (e) {
+  e.preventDefault(); dragDepth = 0; body.classList.remove('dragging');
+  var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+  if (f) loadFile(f);
+  else {
+    var txt = e.dataTransfer && e.dataTransfer.getData('text/plain');
+    if (txt) loadText(txt, 'Dropped text', true);
+  }
+});
+
+// Buttons shouldn't keep focus, so Space always means play/pause.
+document.addEventListener('click', function (e) {
+  var b = e.target.closest && e.target.closest('button');
+  if (b) b.blur();
+});
+
+document.addEventListener('keydown', function (e) {
+  poke();
+  var tag = (e.target.tagName || '').toLowerCase();
+  var typing = tag === 'textarea' || (tag === 'input' && /^(text|number|search)$/.test(e.target.type));
+  if (e.key === 'Escape') {
+    if (body.classList.contains('show-settings')) closeSettings();
+    else if (body.classList.contains('show-loader') && S.cues.length) closeLoader();
+    else if (S.state === 'running' || S.state === 'paused') stopTake();
+    return;
+  }
+  if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (body.classList.contains('show-loader')) return;
+  if (!S.cues.length) return;
+  if (tag === 'input' && e.target.type === 'range' && /^Arrow/.test(e.key)) return;
+  switch (e.key) {
+    case ' ': case 'Spacebar': e.preventDefault(); togglePlay(); break;
+    case 'ArrowLeft': e.preventDefault(); jump(-1); break;
+    case 'ArrowRight': e.preventDefault(); jump(1); break;
+    case 'r': case 'R': startTake(1); break;
+    case 'f': case 'F': toggleFullscreen(); break;
+    case 's': case 'S': body.classList.contains('show-settings') ? closeSettings() : openSettings(); break;
+  }
+});
+
+if (window.ResizeObserver) new ResizeObserver(function () { if (S.cues.length) render(true); }).observe(reader);
+else window.addEventListener('resize', function () { if (S.cues.length) render(true); });
+
+/* Toast */
+var toastTimer = 0;
+function toast(msg, ms) {
+  toastEl.textContent = msg;
+  toastEl.classList.add('on');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () { toastEl.classList.remove('on'); }, ms || 1800);
+}
+
+/* =========================================================
+   Boot
+   ========================================================= */
+applySettings(false);
+var saved = null;
+try { saved = JSON.parse(store.get('tp.srt') || 'null'); } catch (e) { saved = null; }
+if (!(saved && saved.text && loadText(saved.text, saved.name, false))) {
+  body.classList.add('show-loader');
+}
+
+// Exposed for testing in the console.
+window.TP = { parseSRT: parseSRT, locate: locate, clockT: clockT, state: S, settings: settings, fmt: fmt,
+  start: startTake, pause: pause, resume: resume, jump: jump, loadText: loadText };
+})();
+</script>
+</body>
+</html>

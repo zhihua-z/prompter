@@ -1,0 +1,79 @@
+1
+00:00:01,000 --> 00:00:04,200
+Welcome back. Today we're looking at
+how light bends when it changes material.
+
+2
+00:00:04,400 --> 00:00:08,000
+This is called <i>refraction</i>.
+
+3
+00:00:08,000 --> 00:00:11,500
+光从空气进入水中时，
+速度会变慢。
+
+4
+00:00:14,000 --> 00:00:17,500
+That's why a straw looks broken
+in a glass of water.
+
+5
+00:00:17,000 --> 00:00:20,000
+这就是为什么吸管看起来像是<b>折断</b>了。
+
+6
+00:00:20,300 --> 00:00:24,800
+The amount of bending depends on the
+refractive index of each material.
+
+7
+00:00:25,000 --> 00:00:28,000
+折射率越大，光在其中传播得越慢。
+
+8
+00:00:31,500 --> 00:00:35,000
+Let's try a quick example with glass.
+
+9
+00:00:35,200 --> 00:00:39,600
+Glass has a refractive index of about 1.5,
+so light travels at two-thirds of its speed in air.
+
+10
+00:00:39,600 --> 00:00:43,000
+玻璃的折射率大约是一点五。
+
+11
+00:00:43,500 --> 00:00:46,900
+Now watch what happens at a steep angle.
+
+12
+00:00:46,500 --> 00:00:50,200
+<i>Total internal reflection.</i>
+全反射。
+
+13
+00:00:52,000 --> 00:00:55,500
+This is exactly how optical fibres
+carry light around corners.
+
+14
+00:00:55,700 --> 00:00:59,000
+光纤就是利用这个原理传输信号的。
+
+15
+00:00:59,000 --> 00:01:02,500
+So, three things to remember.
+
+16
+00:01:03,000 --> 00:01:06,800
+Light slows down in denser materials,
+it bends towards the normal,
+
+17
+00:01:07,000 --> 00:01:10,500
+and past the critical angle, it reflects completely.
+
+18
+00:01:12,000 --> 00:01:15,000
+谢谢观看，我们下次见！

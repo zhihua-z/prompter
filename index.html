@@ -1,12 +1,12 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0b0b0c">
-<title>Teleprompter</title>
+<title>提词器</title>
 <style>
 :root {
   --bg: #0b0b0c;
@@ -18,14 +18,13 @@
   --fill2: rgba(255,255,255,.12);
   --glass: rgba(30,30,32,.62);
   --accent: #0a84ff;
+  --wait: #ff9f0a;
   --danger: #ff453a;
-  --warn: #ffd60a;
   --shadow: 0 12px 40px rgba(0,0,0,.45), 0 1px 0 rgba(255,255,255,.04) inset;
   --ease: cubic-bezier(.25,.1,.25,1);
   --glide: cubic-bezier(.22,.8,.26,1);
   --fs: 56px;
   --lw: 960px;
-  --anchor: 46%;
   color-scheme: dark;
 }
 :root[data-theme="light"] {
@@ -38,8 +37,8 @@
   --fill2: rgba(0,0,0,.09);
   --glass: rgba(255,255,255,.72);
   --accent: #007aff;
+  --wait: #d97400;
   --danger: #ff3b30;
-  --warn: #c79200;
   --shadow: 0 12px 40px rgba(0,0,0,.12);
   color-scheme: light;
 }
@@ -90,8 +89,8 @@ body:not(.show-loader) #loader { opacity: 0; pointer-events: none; }
   position: relative;
 }
 body:not(.has-srt) .loader-card { background: transparent; border-color: transparent; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
-.loader-card h1 { font-size: 34px; font-weight: 700; letter-spacing: -.02em; margin: 0 0 6px; }
-.loader-card .sub { color: var(--fg2); margin: 0 0 28px; font-size: 16px; line-height: 1.45; }
+.loader-card h1 { font-size: 34px; font-weight: 700; letter-spacing: -.01em; margin: 0 0 8px; }
+.loader-card .sub { color: var(--fg2); margin: 0 0 28px; font-size: 16px; line-height: 1.55; }
 .close-btn { position: absolute; top: 14px; right: 14px; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; color: var(--fg2); background: var(--fill); transition: background 200ms var(--ease); }
 .close-btn:hover { background: var(--fill2); }
 body:not(.has-srt) .close-btn { display: none; }
@@ -100,7 +99,7 @@ body:not(.has-srt) .close-btn { display: none; }
   padding: 36px 20px; border-radius: 14px; text-align: center; cursor: pointer;
   background: var(--fill);
   outline: 1.5px dashed var(--fill2); outline-offset: -1.5px;
-  transition: background 220ms var(--ease), outline-color 220ms var(--ease), transform 220ms var(--ease);
+  transition: background 220ms var(--ease), outline-color 220ms var(--ease);
 }
 .drop:hover, body.dragging .drop { background: var(--fill2); outline-color: var(--accent); }
 .drop svg.i { width: 34px; height: 34px; color: var(--accent); }
@@ -128,10 +127,10 @@ textarea:focus { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 45%, tra
 .btn.primary:hover { background: color-mix(in srgb, var(--accent) 88%, #fff); }
 .btn.link { background: none; color: var(--accent); padding: 0 6px; }
 .error {
-  margin-top: 16px; padding: 12px 14px; border-radius: 12px; font-size: 14px; line-height: 1.45;
+  margin-top: 16px; padding: 12px 14px; border-radius: 12px; font-size: 14px; line-height: 1.5;
   background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--danger);
 }
-.keys { margin-top: 24px; color: var(--fg3); font-size: 13px; line-height: 1.8; }
+.keys { margin-top: 24px; color: var(--fg3); font-size: 13px; line-height: 2; }
 kbd { font-family: inherit; font-size: 12px; padding: 1px 6px; border-radius: 6px; background: var(--fill); color: var(--fg2); }
 
 /* ---------- Stage ---------- */
@@ -142,8 +141,8 @@ body:not(.has-srt) #stage { visibility: hidden; }
   position: absolute; inset: 0; overflow: hidden;
   -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 22%, #000 80%, transparent 100%);
   mask-image: linear-gradient(to bottom, transparent 0, #000 22%, #000 80%, transparent 100%);
+  transition: opacity 300ms var(--ease);
 }
-#reader { transition: opacity 300ms var(--ease); }
 body[data-state="idle"] #reader, body[data-state="finished"] #reader { opacity: .35; }
 .mirror #reader, .mirror #countdown { transform: scaleX(-1); }
 #track {
@@ -164,30 +163,39 @@ body[data-state="idle"] #reader, body[data-state="finished"] #reader { opacity: 
 }
 .cue .txt { display: block; }
 .cue.cur  { opacity: 1; transform: none; }
-.cue.up   { opacity: .78; transform: scale(.88); }
+.cue.up   { opacity: .4; transform: scale(.8); }
 .cue.prev { opacity: .2; }
 .cue.past { opacity: .32; transform: scale(.8); }
 .cue.n1   { opacity: .42; }
 .cue.n2   { opacity: .2; }
+body.preroll .cue.prev { opacity: 0; }
 .cue .bar {
   display: block; height: 3px; width: min(280px, 46%); margin: .3em auto 0; border-radius: 3px;
   background: var(--fill2); overflow: hidden; opacity: 0; transition: opacity 250ms var(--ease);
 }
 .cue .bar i { display: block; height: 100%; width: 100%; background: var(--accent); transform-origin: left center; border-radius: 3px; }
 .cue.cur .bar { opacity: 1; }
-.cue .ready {
-  position: absolute; left: 0; right: 0; bottom: 100%;
-  display: flex; justify-content: center; pointer-events: none;
-  opacity: 0; transition: opacity 250ms var(--ease);
+
+/* Pause marker between two lines when there's a wait */
+.gap {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 14px 0;
+  opacity: 0; transform: scale(.85);
+  transition: opacity 300ms var(--ease), transform 480ms var(--glide);
 }
-.cue .ready b {
-  font-size: 15px; font-weight: 600; letter-spacing: .01em; line-height: 1;
-  padding: 7px 12px; border-radius: 999px; margin-bottom: 10px;
-  color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent);
-  font-variant-numeric: tabular-nums;
+.gap .gp {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 7px 14px 7px 11px; border-radius: 999px;
+  font-size: 16px; font-weight: 600; line-height: 1; letter-spacing: .02em;
+  color: var(--wait); background: color-mix(in srgb, var(--wait) 16%, transparent);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
 }
-.cue.up .ready { opacity: 1; }
-body[data-state="idle"] .cue .ready, body[data-state="finished"] .cue .ready { opacity: 0; }
+.gap .gp svg.i { width: 14px; height: 14px; }
+.gap .gbar { display: block; width: 150px; height: 3px; border-radius: 3px; background: var(--fill2); overflow: hidden; opacity: 0; transition: opacity 250ms var(--ease); }
+.gap .gbar i { display: block; height: 100%; width: 100%; background: var(--wait); transform-origin: left center; border-radius: 3px; }
+.gap.gnext { opacity: 1; transform: none; }
+.gap.gcur { opacity: 1; transform: scale(1.45); }
+.gap.gcur .gbar { opacity: 1; }
 
 /* top bar */
 #topbar {
@@ -230,12 +238,12 @@ body[data-state="idle"] .cue .ready, body[data-state="finished"] .cue .ready { o
 }
 body[data-state="running"] #card, body[data-state="paused"] #card { opacity: 0; transform: translate(-50%, -46%) scale(.98); pointer-events: none; }
 #cardKicker { font-size: 13px; color: var(--fg2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-#cardTitle { font-size: 24px; font-weight: 700; letter-spacing: -.015em; margin: 4px 0 18px; }
+#cardTitle { font-size: 24px; font-weight: 700; letter-spacing: -.01em; margin: 4px 0 18px; }
 .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px; }
 .stat { background: var(--fill); border-radius: 12px; padding: 10px 6px; }
 .stat b { display: block; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.stat span { font-size: 11px; color: var(--fg2); text-transform: uppercase; letter-spacing: .05em; }
-#warn { font-size: 13px; color: var(--fg2); line-height: 1.45; margin: -4px 0 14px; }
+.stat span { font-size: 12px; color: var(--fg2); }
+#warn { font-size: 13px; color: var(--fg2); line-height: 1.5; margin: -4px 0 14px; }
 #warn:empty { display: none; }
 .bigplay {
   width: 76px; height: 76px; border-radius: 50%; margin: 6px auto 8px; display: grid; place-items: center;
@@ -246,7 +254,7 @@ body[data-state="running"] #card, body[data-state="paused"] #card { opacity: 0; 
 .bigplay:hover { transform: scale(1.05); }
 .bigplay:active { transform: scale(.96); }
 .bigplay svg.i { width: 32px; height: 32px; margin-left: 4px; }
-.fromrow { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 15px; color: var(--fg2); margin-top: 10px; }
+.fromrow { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 15px; color: var(--fg2); margin-top: 10px; flex-wrap: wrap; }
 .num {
   width: 64px; height: 34px; border: 0; outline: 0; border-radius: 10px; text-align: center;
   background: var(--fill2); font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums;
@@ -281,8 +289,6 @@ body[data-state="running"] #card, body[data-state="paused"] #card { opacity: 0; 
 body.idle #dock { opacity: 0; transform: translateY(16px); pointer-events: none; }
 body.idle { cursor: none; }
 body[data-state="idle"] #dock, body[data-state="finished"] #dock { opacity: 0; pointer-events: none; transform: translateY(16px); }
-body.preroll .cue.prev { opacity: 0; }
-#fsBtn.hidden { display: none; }
 
 /* settings sheet */
 #settings {
@@ -298,7 +304,7 @@ body:not(.show-settings) #settings { opacity: 0; transform: translateY(-8px) sca
 .set .head { display: flex; justify-content: space-between; align-items: center; font-size: 15px; margin-bottom: 8px; }
 .set .head.only { margin-bottom: 0; }
 .set .val { color: var(--fg2); font-variant-numeric: tabular-nums; font-size: 14px; }
-.set .hint { font-size: 12px; color: var(--fg3); margin-top: 6px; line-height: 1.4; }
+.set .hint { font-size: 12px; color: var(--fg3); margin-top: 6px; line-height: 1.5; }
 input[type="range"] { width: 100%; accent-color: var(--accent); margin: 0; height: 24px; }
 .seg { display: flex; background: var(--fill); border-radius: 10px; padding: 2px; }
 .seg button { flex: 1; height: 30px; border-radius: 8px; font-size: 14px; font-weight: 500; color: var(--fg2); transition: background 200ms var(--ease), color 200ms var(--ease); }
@@ -320,7 +326,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 0; heigh
   position: fixed; left: 16px; right: 16px; bottom: calc(env(safe-area-inset-bottom) + 92px); z-index: 50;
   width: -webkit-fit-content; width: fit-content; margin: 0 auto;
   transform: translateY(10px); opacity: 0; pointer-events: none;
-  padding: 10px 16px; border-radius: 12px; font-size: 14px; text-align: center;
+  padding: 10px 16px; border-radius: 12px; font-size: 14px; line-height: 1.45; text-align: center;
   font-variant-numeric: tabular-nums;
   transition: opacity 240ms var(--ease), transform 240ms var(--ease);
 }
@@ -347,9 +353,10 @@ body.dragging.has-srt:not(.show-loader) #dropHint { opacity: 1; }
   #dock { bottom: calc(env(safe-area-inset-bottom) + 12px); }
   .dockfrom { order: 10; width: 100%; justify-content: center; padding: 4px 0 2px; }
   .cue { padding: .2em 16px; }
+  .gap.gcur { transform: scale(1.3); }
 }
 @media (prefers-reduced-motion: reduce) {
-  #track, .cue { transition-duration: 1ms; }
+  #track, .cue, .gap { transition-duration: 1ms; }
 }
 </style>
 </head>
@@ -370,7 +377,7 @@ body.dragging.has-srt:not(.show-loader) #dropHint { opacity: 1; }
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M6 12h12M12 6v12"/></symbol>
 </svg>
 
-<!-- ============ STAGE ============ -->
+<!-- ============ 阅读区 ============ -->
 <main id="stage">
   <div id="reader"><div id="track"></div></div>
 
@@ -388,103 +395,103 @@ body.dragging.has-srt:not(.show-loader) #dropHint { opacity: 1; }
 
   <section id="card" class="glass">
     <div id="cardKicker"></div>
-    <div id="cardTitle">Ready</div>
+    <div id="cardTitle">准备就绪</div>
     <div class="stats">
-      <div class="stat"><b id="stCues">0</b><span>Cues</span></div>
-      <div class="stat"><b id="stDur">0:00</b><span>Duration</span></div>
-      <div class="stat"><b id="stFirst">0:00</b><span>First cue</span></div>
-      <div class="stat"><b id="stLast">0:00</b><span>Last cue</span></div>
+      <div class="stat"><b id="stCues">0</b><span>字幕条数</span></div>
+      <div class="stat"><b id="stDur">0:00</b><span>总时长</span></div>
+      <div class="stat"><b id="stFirst">0:00</b><span>第一句</span></div>
+      <div class="stat"><b id="stLast">0:00</b><span>最后一句</span></div>
     </div>
     <div id="warn"></div>
-    <button class="bigplay" id="startBtn" aria-label="Start"><svg class="i solid"><use href="#i-play"/></svg></button>
-    <div class="fromrow">Start from cue <input class="num" id="cardFrom" type="number" min="1" step="1" value="1" inputmode="numeric"> <span id="cardOf">of 0</span></div>
+    <button class="bigplay" id="startBtn" aria-label="开始"><svg class="i solid"><use href="#i-play"/></svg></button>
+    <div class="fromrow">从第 <input class="num" id="cardFrom" type="number" min="1" step="1" value="1" inputmode="numeric"> 句开始 <span id="cardOf">（共 0 句）</span></div>
     <div id="beepAt"></div>
     <div class="cardfoot">
-      <button class="btn link" id="changeFile">Change file</button>
-      <label class="row" style="gap:10px;color:var(--fg2)">Sync beep <span class="switch"><input type="checkbox" id="cardBeep"><span></span></span></label>
+      <button class="btn link" id="changeFile">更换文件</button>
+      <label class="row" style="gap:10px;color:var(--fg2)">同步提示音 <span class="switch"><input type="checkbox" id="cardBeep"><span></span></span></label>
     </div>
   </section>
 
   <nav id="dock" class="glass">
-    <button class="ib" id="restartBtn" title="Restart from the beginning (R)"><svg class="i"><use href="#i-restart"/></svg></button>
-    <button class="ib" id="prevBtn" title="Previous cue (←)"><svg class="i"><use href="#i-prev"/></svg></button>
-    <button class="ib main" id="playBtn" title="Pause / Resume (Space)"><svg class="i solid"><use id="playIcon" href="#i-pause"/></svg></button>
-    <button class="ib" id="nextBtn" title="Next cue (→)"><svg class="i"><use href="#i-next"/></svg></button>
+    <button class="ib" id="restartBtn" title="从头开始（R）" aria-label="从头开始"><svg class="i"><use href="#i-restart"/></svg></button>
+    <button class="ib" id="prevBtn" title="上一句（←）" aria-label="上一句"><svg class="i"><use href="#i-prev"/></svg></button>
+    <button class="ib main" id="playBtn" title="暂停 / 继续（空格）" aria-label="暂停 / 继续"><svg class="i solid"><use id="playIcon" href="#i-pause"/></svg></button>
+    <button class="ib" id="nextBtn" title="下一句（→）" aria-label="下一句"><svg class="i"><use href="#i-next"/></svg></button>
     <div class="sep"></div>
-    <div class="dockfrom">Cue <input class="num" id="dockFrom" type="number" min="1" step="1" value="1" inputmode="numeric"><button class="btn" id="dockGo" title="Start a new take from this cue with a 3-second pre-roll">Start here</button></div>
+    <div class="dockfrom">第 <input class="num" id="dockFrom" type="number" min="1" step="1" value="1" inputmode="numeric"> 句 <button class="btn" id="dockGo" title="从这一句重新录一条，先倒数 3 秒">从这里录</button></div>
     <div class="sep"></div>
-    <button class="ib" id="setBtn" title="Settings"><svg class="i"><use href="#i-settings"/></svg></button>
-    <button class="ib" id="fsBtn" title="Fullscreen (F)"><svg class="i"><use href="#i-fs"/></svg></button>
-    <button class="ib" id="stopBtn" title="Stop (Esc)"><svg class="i solid"><use href="#i-stop"/></svg></button>
+    <button class="ib" id="setBtn" title="设置（S）" aria-label="设置"><svg class="i"><use href="#i-settings"/></svg></button>
+    <button class="ib" id="fsBtn" title="全屏（F）" aria-label="全屏"><svg class="i"><use href="#i-fs"/></svg></button>
+    <button class="ib" id="stopBtn" title="停止（Esc）" aria-label="停止"><svg class="i solid"><use href="#i-stop"/></svg></button>
   </nav>
 </main>
 
-<!-- ============ LOADER ============ -->
+<!-- ============ 载入 ============ -->
 <section id="loader">
   <div class="loader-card glass">
-    <button class="close-btn" id="loaderClose" aria-label="Close"><svg class="i" style="width:18px;height:18px"><use href="#i-close"/></svg></button>
-    <h1>Teleprompter</h1>
-    <p class="sub">Load your video’s subtitles, press Start, and read each line as it comes up — in exact sync with the SRT timings.</p>
+    <button class="close-btn" id="loaderClose" aria-label="关闭"><svg class="i" style="width:18px;height:18px"><use href="#i-close"/></svg></button>
+    <h1>提词器</h1>
+    <p class="sub">载入视频的 SRT 字幕，按下开始，每一句都会按字幕时间准确出现，跟着读就行。</p>
     <label class="drop" id="drop">
       <svg class="i"><use href="#i-upload"/></svg>
-      <strong>Drop an .srt file here</strong>
-      <span>or click to choose a file</span>
+      <strong>把 .srt 文件拖到这里</strong>
+      <span>或点击选择文件</span>
       <input type="file" id="fileInput" accept=".srt,.txt,text/plain,application/x-subrip" hidden>
     </label>
-    <div class="or">or paste SRT text</div>
-    <textarea id="paste" placeholder="1&#10;00:00:01,000 --> 00:00:04,000&#10;Hello there." spellcheck="false"></textarea>
+    <div class="or">或粘贴 SRT 文本</div>
+    <textarea id="paste" placeholder="1&#10;00:00:01,000 --> 00:00:04,000&#10;你好。" spellcheck="false"></textarea>
     <div class="row" style="margin-top:12px">
-      <button class="btn primary" id="pasteLoad">Load text</button>
-      <button class="btn" id="sampleLoad">Try the sample</button>
+      <button class="btn primary" id="pasteLoad">载入文本</button>
+      <button class="btn" id="sampleLoad">试用示例</button>
     </div>
     <div class="error hidden" id="loadError" role="alert"></div>
     <div class="keys">
-      <kbd>Space</kbd> pause / resume &nbsp;·&nbsp; <kbd>←</kbd> <kbd>→</kbd> previous / next cue &nbsp;·&nbsp; <kbd>R</kbd> restart &nbsp;·&nbsp; <kbd>F</kbd> fullscreen &nbsp;·&nbsp; <kbd>S</kbd> settings
+      <kbd>空格</kbd> 暂停 / 继续 &nbsp;·&nbsp; <kbd>←</kbd> <kbd>→</kbd> 上一句 / 下一句 &nbsp;·&nbsp; <kbd>R</kbd> 从头开始 &nbsp;·&nbsp; <kbd>F</kbd> 全屏 &nbsp;·&nbsp; <kbd>S</kbd> 设置
     </div>
   </div>
 </section>
 
-<!-- ============ SETTINGS ============ -->
-<aside id="settings" class="glass" aria-label="Settings">
+<!-- ============ 设置 ============ -->
+<aside id="settings" class="glass" aria-label="设置">
   <div style="display:flex;justify-content:space-between;align-items:center">
-    <h2>Settings</h2>
-    <button class="close-btn" id="setClose" style="position:static;display:grid" aria-label="Close settings"><svg class="i" style="width:16px;height:16px"><use href="#i-close"/></svg></button>
+    <h2>设置</h2>
+    <button class="close-btn" id="setClose" style="position:static;display:grid" aria-label="关闭设置"><svg class="i" style="width:16px;height:16px"><use href="#i-close"/></svg></button>
   </div>
   <div class="set">
-    <div class="head"><span>Text size</span><span class="val" id="vFs"></span></div>
+    <div class="head"><span>文字大小</span><span class="val" id="vFs"></span></div>
     <input type="range" id="sFs" min="28" max="104" step="2">
   </div>
   <div class="set">
-    <div class="head"><span>Line width</span><span class="val" id="vLw"></span></div>
+    <div class="head"><span>行宽</span><span class="val" id="vLw"></span></div>
     <input type="range" id="sLw" min="480" max="1600" step="20">
   </div>
   <div class="set">
-    <div class="head"><span>Theme</span></div>
-    <div class="seg" id="sTheme"><button data-v="dark">Dark</button><button data-v="light">Light</button></div>
+    <div class="head"><span>主题</span></div>
+    <div class="seg" id="sTheme"><button data-v="dark">深色</button><button data-v="light">浅色</button></div>
   </div>
   <div class="set">
-    <div class="head"><span>Timing offset</span>
+    <div class="head"><span>时间偏移</span>
       <div class="stepper">
-        <button class="ib" id="offMinus" aria-label="Earlier"><svg class="i" style="width:16px;height:16px"><use href="#i-minus"/></svg></button>
+        <button class="ib" id="offMinus" aria-label="提前 0.1 秒"><svg class="i" style="width:16px;height:16px"><use href="#i-minus"/></svg></button>
         <input class="num" id="sOff" type="number" step="0.1" inputmode="decimal">
-        <button class="ib" id="offPlus" aria-label="Later"><svg class="i" style="width:16px;height:16px"><use href="#i-plus"/></svg></button>
+        <button class="ib" id="offPlus" aria-label="延后 0.1 秒"><svg class="i" style="width:16px;height:16px"><use href="#i-plus"/></svg></button>
       </div>
     </div>
-    <div class="hint">Seconds added to every cue. Positive = lines come later.</div>
+    <div class="hint">给每条字幕加上的秒数。正数 = 字幕更晚出现。</div>
   </div>
   <div class="set">
-    <div class="head"><span>Lead</span><span class="val" id="vLead"></span></div>
+    <div class="head"><span>提前显示</span><span class="val" id="vLead"></span></div>
     <input type="range" id="sLead" min="0" max="1" step="0.1">
-    <div class="hint">Show each line a little early so you can start reading on time. Progress bars and the beep still use the real timing.</div>
+    <div class="hint">让每一句稍早出现，方便你准时开口。进度条、停顿倒计时和提示音仍按真实时间。</div>
   </div>
-  <div class="set"><div class="head only"><span>Mirror text</span><span class="switch"><input type="checkbox" id="sMirror"><span></span></span></div></div>
-  <div class="set"><div class="head only"><span>Sync beep at start</span><span class="switch"><input type="checkbox" id="sBeep"><span></span></span></div></div>
-  <div class="set"><div class="head only"><span>Sync flash at start</span><span class="switch"><input type="checkbox" id="sFlash"><span></span></span></div>
-    <div class="hint">A 1 kHz, 100 ms beep and a one-frame white flash mark the take’s start time, so you can line up your phone recording later. On iPhone, turn the silent switch off to hear the beep.</div></div>
+  <div class="set"><div class="head only"><span>镜像文字</span><span class="switch"><input type="checkbox" id="sMirror"><span></span></span></div></div>
+  <div class="set"><div class="head only"><span>开始时的同步提示音</span><span class="switch"><input type="checkbox" id="sBeep"><span></span></span></div></div>
+  <div class="set"><div class="head only"><span>开始时的同步闪光</span><span class="switch"><input type="checkbox" id="sFlash"><span></span></span></div>
+    <div class="hint">开始时会发出 1 kHz、100 毫秒的提示音，并让屏幕闪白一帧，方便后期对齐手机录音。iPhone 需关闭静音模式才能听到提示音。</div></div>
 </aside>
 
 <div id="toast" class="glass"></div>
-<div id="dropHint">Drop to load subtitles</div>
+<div id="dropHint">松开即可载入字幕</div>
 <div id="flash"></div>
 
 <script type="text/plain" id="sampleSrt">1
@@ -576,10 +583,11 @@ and past the critical angle, it reflects completely.
    Constants & helpers
    ========================================================= */
 var PREROLL = 3;          // seconds of countdown before the take's start time
-var HOLD_GAP = 0.4;       // gaps shorter than this keep the previous line on screen
+var HOLD_GAP = 0.4;       // gaps shorter than this keep the previous line on screen (no pause marker)
 var END_HOLD = 2;         // seconds after the last cue before showing "Finished"
 var IDLE_MS = 2500;       // auto-hide controls after this much inactivity
 var MAX_BYTES = 8 * 1024 * 1024;
+var SVG_NS = 'http://www.w3.org/2000/svg';
 
 var $ = function (id) { return document.getElementById(id); };
 var clamp = function (v, a, b) { return v < a ? a : v > b ? b : v; };
@@ -598,6 +606,7 @@ function fmt(t, withMs) {
   var h = Math.floor(ms / 3600000), m = Math.floor(ms / 60000) % 60, s = Math.floor(ms / 1000) % 60, f = ms % 1000;
   return (neg ? '−' : '') + (h ? h + ':' : '') + pad(m, 2) + ':' + pad(s, 2) + (withMs ? '.' + pad(f, 3) : '');
 }
+function secs(x) { return (Math.round(x * 10) / 10).toFixed(1); }
 
 /* =========================================================
    SRT parsing
@@ -636,8 +645,8 @@ function isBlockStart(lines, i) {
 }
 
 function parseSRT(raw) {
-  if (typeof raw !== 'string' || !raw.trim()) throw new Error('The subtitle text is empty.');
-  if ((raw.match(/\u0000/g) || []).length > 8) throw new Error('This doesn’t look like a text file. Please choose an .srt subtitle file.');
+  if (typeof raw !== 'string' || !raw.trim()) throw new Error('字幕内容为空。');
+  if ((raw.match(/\u0000/g) || []).length > 8) throw new Error('这看起来不是文本文件，请选择 .srt 字幕文件。');
   var lines = raw.replace(/^﻿/, '').replace(/\r\n?/g, '\n').split('\n');
   var cues = [], emptyCount = 0, fixedCount = 0;
   var i = 0;
@@ -666,7 +675,7 @@ function parseSRT(raw) {
     cues.push({ start: start, end: end, text: text, n: cues.length });
   }
   if (!cues.length) {
-    throw new Error('No subtitle cues found. An SRT needs timing lines like “00:01:02,345 --> 00:01:05,678”.');
+    throw new Error('没有找到字幕。SRT 文件需要类似“00:01:02,345 --> 00:01:05,678”的时间行。');
   }
   cues.sort(function (a, b) { return a.start - b.start || a.n - b.n; });
   var overlaps = 0;
@@ -690,14 +699,14 @@ function decodeBytes(u8) {
 }
 function readFile(file) {
   return new Promise(function (resolve, reject) {
-    if (!file) return reject(new Error('No file selected.'));
-    if (file.size === 0) return reject(new Error('“' + file.name + '” is empty.'));
-    if (file.size > MAX_BYTES) return reject(new Error('“' + file.name + '” is too large to be a subtitle file.'));
+    if (!file) return reject(new Error('没有选择文件。'));
+    if (file.size === 0) return reject(new Error('“' + file.name + '”是空文件。'));
+    if (file.size > MAX_BYTES) return reject(new Error('“' + file.name + '”太大了，不像是字幕文件。'));
     var fr = new FileReader();
     fr.onload = function () {
-      try { resolve(decodeBytes(new Uint8Array(fr.result))); } catch (e) { reject(new Error('Could not read “' + file.name + '”.')); }
+      try { resolve(decodeBytes(new Uint8Array(fr.result))); } catch (e) { reject(new Error('无法读取“' + file.name + '”。')); }
     };
-    fr.onerror = function () { reject(new Error('Could not read “' + file.name + '”.')); };
+    fr.onerror = function () { reject(new Error('无法读取“' + file.name + '”。')); };
     fr.readAsArrayBuffer(file);
   });
 }
@@ -710,14 +719,16 @@ var settings = Object.assign({}, DEFAULTS);
 try { Object.assign(settings, JSON.parse(store.get('tp.settings') || '{}')); } catch (e) { /* ignore */ }
 
 var S = {
-  cues: [], name: '', els: [],
+  cues: [], name: '',
+  els: [],                  // one element per cue
+  gaps: [],                 // gaps[i] = pause marker shown before cue i (or null)
   state: 'idle',            // idle | running | paused | finished
   clockBase: 0,             // clock value (s) at `anchor`
   anchor: 0,                // performance.now() when clockBase was set
   takeStart: 0,             // clock time of the take's sync mark (beep)
   takeCue: 0,
   markFired: false, beepRefined: false, beepNode: null,
-  lastKey: '', classed: [], focus: -1, lastCd: -1,
+  lastKey: '', classed: [], focusEl: null, focus: -1, lastCd: -1,
   raf: 0
 };
 
@@ -730,7 +741,7 @@ function totalDur() { var c = S.cues; return c.length ? c[c.length - 1].end + se
 function lastEnd() { var m = 0; for (var i = 0; i < S.cues.length; i++) m = Math.max(m, S.cues[i].end); return m; }
 
 /* Which cue is on screen at clock time t.
-   cur = the line being read, up = the next line during a gap, done = after the last line. */
+   cur = the line being read, up = the next line during a pause, done = after the last line. */
 function locate(t) {
   var cues = S.cues, n = cues.length;
   var tl = t - settings.offset + settings.lead;
@@ -757,38 +768,79 @@ var flashEl = $('flash'), toastEl = $('toast');
 /* =========================================================
    Building the cue list
    ========================================================= */
+function makeGap(len) {
+  var g = document.createElement('div');
+  g.className = 'gap'; g._base = 'gap'; g._len = len;
+  var pill = document.createElement('span'); pill.className = 'gp';
+  var svg = document.createElementNS(SVG_NS, 'svg'); svg.setAttribute('class', 'i solid');
+  var use = document.createElementNS(SVG_NS, 'use'); use.setAttribute('href', '#i-pause'); svg.appendChild(use);
+  var label = document.createElement('b'); label.textContent = '停顿 ' + secs(len) + ' 秒';
+  pill.appendChild(svg); pill.appendChild(label);
+  var bar = document.createElement('span'); bar.className = 'gbar'; var bi = document.createElement('i'); bar.appendChild(bi);
+  g.appendChild(pill); g.appendChild(bar);
+  g._label = label; g._bar = bi; g._mode = 'next';
+  return g;
+}
+
 function buildTrack() {
   track.textContent = '';
-  S.els = [];
+  S.els = []; S.gaps = [];
   var frag = document.createDocumentFragment();
   for (var i = 0; i < S.cues.length; i++) {
+    var c = S.cues[i];
+    // Pause marker before this cue: always before the first one (lead-in), otherwise only for real waits.
+    var len = i === 0 ? c.start : c.start - S.cues[i - 1].end;
+    var g = null;
+    if (i === 0 || len >= HOLD_GAP) { g = makeGap(Math.max(len, 0)); frag.appendChild(g); }
+    S.gaps.push(g);
+
     var el = document.createElement('div');
-    el.className = 'cue';
-    var ready = document.createElement('span'); ready.className = 'ready'; ready.appendChild(document.createElement('b'));
-    var txt = document.createElement('span'); txt.className = 'txt'; txt.textContent = S.cues[i].text;
+    el.className = 'cue'; el._base = 'cue';
+    var txt = document.createElement('span'); txt.className = 'txt'; txt.textContent = c.text;
     var bar = document.createElement('span'); bar.className = 'bar'; bar.appendChild(document.createElement('i'));
-    el.appendChild(ready); el.appendChild(txt); el.appendChild(bar);
+    el.appendChild(txt); el.appendChild(bar);
     frag.appendChild(el);
     S.els.push(el);
   }
   track.appendChild(frag);
-  S.classed = []; S.lastKey = ''; S.focus = -1;
+  S.classed = []; S.lastKey = ''; S.focus = -1; S.focusEl = null;
 }
 
-function applyClasses(L, focus) {
-  for (var i = 0; i < S.classed.length; i++) {
-    var e = S.els[S.classed[i]]; if (e) e.className = 'cue';
-  }
+function applyClasses(L) {
+  for (var i = 0; i < S.classed.length; i++) S.classed[i].className = S.classed[i]._base;
   S.classed = [];
-  var set = function (idx, cls) { if (idx >= 0 && idx < S.els.length) { S.els[idx].className = 'cue ' + cls; S.classed.push(idx); } };
-  set(focus - 1, 'prev');
-  set(focus, L.cur >= 0 ? 'cur' : L.up >= 0 ? 'up' : 'past');
-  set(focus + 1, 'n1');
-  set(focus + 2, 'n2');
+  var set = function (el, cls) { if (el) { el.className = el._base + ' ' + cls; S.classed.push(el); } };
+  var c = S.els, g = S.gaps, n = c.length, k;
+  if (L.cur >= 0) {
+    k = L.cur;
+    set(c[k - 1], 'prev');
+    set(c[k], 'cur');
+    if (g[k + 1]) { set(g[k + 1], 'gnext'); gapLabel(g[k + 1], 'next'); }  // warn ahead: a pause follows this line
+    set(c[k + 1], 'n1');
+    set(c[k + 2], 'n2');
+    S.focus = k; S.focusEl = c[k];
+  } else if (L.up >= 0) {
+    k = L.up;
+    set(c[k - 1], 'prev');
+    if (g[k]) { set(g[k], 'gcur'); gapLabel(g[k], 'wait'); }               // the pause itself
+    set(c[k], 'up');
+    set(c[k + 1], 'n2');
+    S.focus = k; S.focusEl = g[k] || c[k];
+  } else {
+    k = n - 1;
+    set(c[k - 1], 'prev');
+    set(c[k], 'past');
+    S.focus = k; S.focusEl = c[k];
+  }
+}
+function gapLabel(g, mode) {
+  if (g._mode === mode) return;
+  g._mode = mode;
+  if (mode === 'next') { g._label.textContent = '停顿 ' + secs(g._len) + ' 秒'; g._bar.style.transform = 'scaleX(1)'; }
 }
 
 function positionTrack(instant) {
-  var el = S.els[S.focus];
+  var el = S.focusEl;
   if (!el) return;
   var anchor = reader.clientHeight * 0.46;
   var y = Math.round(anchor - (el.offsetTop + el.offsetHeight / 2));
@@ -811,15 +863,14 @@ function render(instant) {
   var off = settings.offset;
   var L = locate(t);
   var n = S.cues.length;
-  var focus = L.cur >= 0 ? L.cur : L.up >= 0 ? L.up : n - 1;
   var key = L.cur + '|' + L.up + '|' + (L.done ? 1 : 0);
   if (key !== S.lastKey || instant) {
     S.lastKey = key;
-    var moved = focus !== S.focus;
-    S.focus = focus;
-    applyClasses(L, focus);
-    if (moved || instant) positionTrack(instant);
+    var prevFocusEl = S.focusEl;
+    applyClasses(L);
+    if (S.focusEl !== prevFocusEl || instant) positionTrack(instant);
   }
+  var focus = S.focus;
 
   // Per-cue progress: share of the cue's (real, un-led) time window that's left.
   if (L.cur >= 0) {
@@ -827,19 +878,21 @@ function render(instant) {
     var rem = clamp((ce - t) / (ce - cs), 0, 1);
     S.els[L.cur].lastChild.firstChild.style.transform = 'scaleX(' + rem.toFixed(4) + ')';
   }
-  // "Get ready" countdown in gaps.
-  if (L.up >= 0) {
+  // Pause countdown: time left until the next line really starts.
+  if (L.up >= 0 && S.gaps[L.up]) {
+    var g = S.gaps[L.up];
     var dt = S.cues[L.up].start + off - t;
-    S.els[L.up].firstChild.firstChild.textContent = dt > 0.05 ? 'Get ready · ' + dt.toFixed(1) + ' s' : 'Now';
+    g._label.textContent = dt > 0.05 ? '等待 · ' + secs(dt) + ' 秒' : '开始';
+    g._bar.style.transform = 'scaleX(' + (g._len > 0 ? clamp(dt / g._len, 0, 1) : 0).toFixed(4) + ')';
   }
 
   // Top bar.
   var preroll = S.state !== 'idle' && !S.markFired && t < S.takeStart;
-  var shown = (S.state === 'idle') ? S.takeStart : preroll ? S.takeStart : t;
+  var shown = (S.state === 'idle' || preroll) ? S.takeStart : t;
   clockEl.textContent = fmt(shown);
   var tot = totalDur();
   overallBar.style.transform = 'scaleX(' + (tot > 0 ? clamp(shown / tot, 0, 1) : 0).toFixed(4) + ')';
-  cueNoEl.textContent = (focus + 1) + ' / ' + n;
+  cueNoEl.textContent = '第 ' + (focus + 1) + ' / ' + n + ' 句';
 
   // Pre-roll countdown 3-2-1.
   if (preroll) {
@@ -873,7 +926,6 @@ function loop() {
   else S.raf = 0;
 }
 function startLoop() { if (!S.raf) S.raf = requestAnimationFrame(loop); }
-function renderSoon(instant) { requestAnimationFrame(function () { render(!!instant); }); }
 
 /* =========================================================
    Audio sync beep (Web Audio, scheduled on the audio clock)
@@ -944,7 +996,7 @@ function keepAwake(on) {
   if (wakeLock) return;
   var warn = function () {
     if (wakeWarned) return; wakeWarned = true;
-    toast('Can’t keep the screen awake here — set Auto-Lock / sleep to “Never” while recording.', 5000);
+    toast('此浏览器无法保持屏幕常亮，录音时请把“自动锁定 / 睡眠”设为“永不”。', 5000);
   };
   if (!('wakeLock' in navigator)) return warn();
   navigator.wakeLock.request('screen').then(function (l) {
@@ -982,8 +1034,8 @@ function startTake(n) {
   S.markFired = false; S.beepRefined = false; S.lastCd = -1;
   setClock(S.takeStart - PREROLL);
   setState('running');
-  takeEl.innerHTML = 'Take from cue ' + (idx + 1) + ' · sync mark <em>' + fmt(S.takeStart) + '</em>';
-  cdLabel.innerHTML = (settings.beep ? 'Beep at ' : 'Starts at ') + '<em>' + fmt(S.takeStart) + '</em>' + (idx > 0 ? ' · cue ' + (idx + 1) : '');
+  takeEl.innerHTML = '本条从第 ' + (idx + 1) + ' 句开始 · 同步点 <em>' + fmt(S.takeStart) + '</em>';
+  cdLabel.innerHTML = (settings.beep ? '提示音 ' : '开始于 ') + '<em>' + fmt(S.takeStart) + '</em>' + (idx > 0 ? ' · 第 ' + (idx + 1) + ' 句' : '');
   closeSettings();
   render(true);
   startLoop();
@@ -1034,7 +1086,7 @@ function jump(d) {
   setClock(c.start + settings.offset - settings.lead + 0.0005);
   S.lastKey = '';
   render(false);
-  toast('Cue ' + (idx + 1) + ' · ' + fmt(c.start + settings.offset));
+  toast('第 ' + (idx + 1) + ' 句 · ' + fmt(c.start + settings.offset));
 }
 
 function finish() {
@@ -1042,8 +1094,8 @@ function finish() {
   cancelBeep();
   setState('finished');
   keepAwake(false);
-  $('cardTitle').textContent = 'Finished';
-  $('cardKicker').textContent = 'Take from cue ' + (S.takeCue + 1) + ' · sync mark ' + fmt(S.takeStart);
+  $('cardTitle').textContent = '已完成';
+  $('cardKicker').textContent = '本条从第 ' + (S.takeCue + 1) + ' 句开始 · 同步点 ' + fmt(S.takeStart);
   setFrom(1);
 }
 
@@ -1055,8 +1107,8 @@ function stopTake() {
 }
 
 function showReady() {
-  $('cardTitle').textContent = 'Ready';
-  $('cardKicker').textContent = S.name || 'Subtitles';
+  $('cardTitle').textContent = '准备就绪';
+  $('cardKicker').textContent = S.name || '字幕';
   previewFrom();
 }
 
@@ -1073,7 +1125,7 @@ function previewFrom() {
   S.takeStart = cueStartClock(idx);
   // Show the chosen cue as the current line behind the card.
   S.clockBase = S.cues[idx].start + settings.offset - settings.lead + 0.0005;
-  $('beepAt').textContent = (settings.beep ? 'Beep' : 'Sync mark') + ' at ' + fmt(S.takeStart) + ' after a 3-second countdown';
+  $('beepAt').textContent = '倒数 3 秒后，' + (settings.beep ? '在 ' + fmt(S.takeStart) + ' 发出提示音' : '从 ' + fmt(S.takeStart) + ' 开始');
   render(true);
 }
 
@@ -1097,7 +1149,7 @@ function loadText(text, name, save) {
   if (S.state === 'running' || S.state === 'paused') { cancelBeep(); keepAwake(false); }
   setState('idle');
   S.cues = res.cues;
-  S.name = name || 'Pasted subtitles';
+  S.name = name || '粘贴的字幕';
   buildTrack();
 
   var c = S.cues;
@@ -1107,17 +1159,17 @@ function loadText(text, name, save) {
   $('stLast').textContent = fmt(c[c.length - 1].start, false);
   $('stFirst').title = fmt(c[0].start);
   $('stLast').title = fmt(c[c.length - 1].start) + ' → ' + fmt(c[c.length - 1].end);
-  $('cardOf').textContent = 'of ' + c.length;
+  $('cardOf').textContent = '（共 ' + c.length + ' 句）';
   $('cardFrom').max = $('dockFrom').max = c.length;
   totalEl.textContent = '/ ' + fmt(totalDur(), false);
   var w = [];
-  if (res.overlaps) w.push(res.overlaps + ' overlapping cue' + (res.overlaps > 1 ? 's' : '') + ' (the later one is shown).');
-  if (res.fixedCount) w.push(res.fixedCount + ' cue' + (res.fixedCount > 1 ? 's' : '') + ' had an end time before the start; given 1 s.');
-  if (res.emptyCount) w.push(res.emptyCount + ' empty cue' + (res.emptyCount > 1 ? 's' : '') + ' skipped.');
+  if (res.overlaps) w.push('有 ' + res.overlaps + ' 处字幕时间重叠（显示较晚开始的那句）。');
+  if (res.fixedCount) w.push('有 ' + res.fixedCount + ' 条字幕的结束时间早于开始时间，已改为 1 秒。');
+  if (res.emptyCount) w.push('已跳过 ' + res.emptyCount + ' 条空字幕。');
   $('warn').textContent = w.join(' ');
 
   if (save) {
-    if (!store.set('tp.srt', JSON.stringify({ name: S.name, text: text }))) toast('Loaded, but couldn’t save it for next time (storage unavailable).', 4000);
+    if (!store.set('tp.srt', JSON.stringify({ name: S.name, text: text }))) toast('已载入，但无法保存到本机，刷新后需要重新载入。', 4000);
   }
   body.classList.add('has-srt');
   closeLoader();
@@ -1153,7 +1205,7 @@ function applySettings(reflow) {
   document.querySelector('meta[name="theme-color"]').content = settings.theme === 'light' ? '#f5f5f7' : '#0b0b0c';
   $('sFs').value = settings.fs; $('vFs').textContent = settings.fs + ' px';
   $('sLw').value = settings.lw; $('vLw').textContent = settings.lw + ' px';
-  $('sLead').value = settings.lead; $('vLead').textContent = settings.lead > 0 ? settings.lead.toFixed(1) + ' s early' : 'Off';
+  $('sLead').value = settings.lead; $('vLead').textContent = settings.lead > 0 ? '提前 ' + settings.lead.toFixed(1) + ' 秒' : '关闭';
   if (document.activeElement !== $('sOff')) $('sOff').value = settings.offset.toFixed(2);
   $('sMirror').checked = !!settings.mirror;
   $('sBeep').checked = $('cardBeep').checked = !!settings.beep;
@@ -1182,7 +1234,6 @@ function setOffset(v) {
   v = Math.round(clamp(v, -600, 600) * 100) / 100;
   if (isNaN(v)) v = 0;
   setSetting('offset', v, true);
-  // Keep the take's sync mark on its cue if we're waiting at the card.
   $('sOff').value = v.toFixed(2);
 }
 $('sOff').addEventListener('change', function () { setOffset(parseFloat(this.value)); });
@@ -1246,8 +1297,8 @@ $('dockFrom').addEventListener('keydown', function (e) { if (e.key === 'Enter') 
 $('fileInput').addEventListener('change', function () { if (this.files[0]) loadFile(this.files[0]); this.value = ''; });
 $('pasteLoad').addEventListener('click', function () {
   var v = $('paste').value;
-  if (!v.trim()) { showError('Paste the contents of an .srt file into the box first.'); return; }
-  loadText(v, 'Pasted subtitles', true);
+  if (!v.trim()) { showError('请先把 .srt 文件的内容粘贴到上面的框里。'); return; }
+  loadText(v, '粘贴的字幕', true);
 });
 $('sampleLoad').addEventListener('click', function () { loadText($('sampleSrt').textContent.replace(/^\n/, ''), 'sample.srt', true); });
 
@@ -1262,7 +1313,7 @@ window.addEventListener('drop', function (e) {
   if (f) loadFile(f);
   else {
     var txt = e.dataTransfer && e.dataTransfer.getData('text/plain');
-    if (txt) loadText(txt, 'Dropped text', true);
+    if (txt) loadText(txt, '拖入的文本', true);
   }
 });
 
@@ -1282,7 +1333,7 @@ document.addEventListener('keydown', function (e) {
     else if (S.state === 'running' || S.state === 'paused') stopTake();
     return;
   }
-  if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (typing || e.metaKey || e.ctrlKey || e.altKey || e.isComposing) return;
   if (body.classList.contains('show-loader')) return;
   if (!S.cues.length) return;
   if (tag === 'input' && e.target.type === 'range' && /^Arrow/.test(e.key)) return;
